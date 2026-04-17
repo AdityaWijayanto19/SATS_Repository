@@ -1,7 +1,7 @@
-@extends('layouts.app')
+@extends('layouts.auth')
 
 @section('content')
-    <div class="pt-8 flex items-center justify-center bg-[rgb(251, 242, 238)]">
+    <div class="pt-3 flex items-center justify-center bg-[rgb(251, 242, 238)]">
         <div class="flex w-full max-w-5xl min-h-50 rounded-2xl overflow-hidden shadow-sm border border-gray-100">
 
             {{-- Kiri: Image Slider --}}
@@ -59,7 +59,7 @@
                 <h1 class="text-2xl font-medium text-gray-800">Selamat datang kembali</h1>
                 <p class="text-sm text-gray-500 mt-1 mb-8">Masuk ke akun kamu untuk melanjutkan</p>
 
-                <form method="POST">
+                <form action="{{ route('login.process') }}" method="POST">
                     @csrf
 
                     {{-- Email --}}
@@ -104,33 +104,33 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
 
-            let cur = 0;
-            const slides = document.querySelectorAll('.slide');
-            const dots = document.querySelectorAll('.dot');
-            let timer = setInterval(() => changeSlide(1), 4000);
+                let cur = 0;
+                const slides = document.querySelectorAll('.slide');
+                const dots = document.querySelectorAll('.dot');
+                let timer = setInterval(() => changeSlide(1), 4000);
 
-            function goSlide(n) {
-                slides[cur].classList.replace('opacity-100', 'opacity-0');
-                dots[cur].classList.remove('w-6', 'bg-white');
-                dots[cur].classList.add('w-2', 'bg-white/40');
+                function goSlide(n) {
+                    slides[cur].classList.replace('opacity-100', 'opacity-0');
+                    dots[cur].classList.remove('w-6', 'bg-white');
+                    dots[cur].classList.add('w-2', 'bg-white/40');
 
-                cur = n;
+                    cur = n;
 
-                slides[cur].classList.replace('opacity-0', 'opacity-100');
-                dots[cur].classList.remove('w-2', 'bg-white/40');
-                dots[cur].classList.add('w-6', 'bg-white');
-            }
+                    slides[cur].classList.replace('opacity-0', 'opacity-100');
+                    dots[cur].classList.remove('w-2', 'bg-white/40');
+                    dots[cur].classList.add('w-6', 'bg-white');
+                }
 
-            function changeSlide(dir) {
-                clearInterval(timer);
-                goSlide((cur + dir + slides.length) % slides.length);
-                timer = setInterval(() => changeSlide(1), 4000);
-            }
+                function changeSlide(dir) {
+                    clearInterval(timer);
+                    goSlide((cur + dir + slides.length) % slides.length);
+                    timer = setInterval(() => changeSlide(1), 4000);
+                }
 
-            window.goSlide = goSlide;
-            window.changeSlide = changeSlide;
+                window.goSlide = goSlide;
+                window.changeSlide = changeSlide;
 
-        });
+            });
         </script>
     @endpush
 @endsection
