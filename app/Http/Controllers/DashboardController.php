@@ -6,15 +6,27 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    // Menampilkan dashboard
-    public function viewDashboard(){
+    // Menampilkan halaman dashboard
+    public function viewDashboardPage(){
         return view('pages.dashboard');
     }
 
-    // Menampilkan login page
-    public function viewLogin(){
+    // Menampilkan halaman input data pasien
+    public function viewInputDataPasienPage(){
+        return view('pages.inputdata');
+    }
+
+    // Menampilkan halaman laporan
+    public function viewLaporanPage(){
+        return view('pages.laporan');
+    }
+
+    // Menampilkan halaman login
+    public function viewLoginPage(){
         return view('pages.login');
     }
+
+    
 
     // Function untuk proses login
     public function login(Request $request)

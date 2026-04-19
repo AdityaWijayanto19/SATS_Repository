@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <title>Smart Ambulance Telemedicine System</title>
     @vite('resources/css/app.css')
+
+    {{-- Alpine.js — untuk sementara di frontend, agar x-data, x-show, @click, dll berfungsi --}}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="h-screen flex flex-col">
 
