@@ -41,7 +41,11 @@ class AuthService
 
     private function redirectByRole(string $role): string
     {
-        return config('roles.' . $role, '/');
+        return match($role) {
+            'nakes'      => '/nakes/dashboard',
+            'superadmin' => '/superadmin/dashboard',
+            default      => '/',
+        };
     }
 
     public function generateResetToken(string $email): ?string

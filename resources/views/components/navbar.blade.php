@@ -29,7 +29,7 @@
         </div>
 
         <!-- Logout -->
-        <form method="POST">
+        <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit"
                 class="text-[rgba(0,75,57,0.51)] text-sm font-medium bg-red-200 px-4 py-1.5 rounded-md transition cursor-pointer hover:bg-red-500 hover:text-white">

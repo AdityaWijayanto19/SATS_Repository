@@ -23,7 +23,15 @@ class AuthController extends Controller
     public function viewLoginPage(): View|RedirectResponse
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            $user = Auth::user();
+
+            if ($user->role === 'nakes') {
+                return redirect('/nakes/dashboard');
+            }
+
+            if ($user->role === 'superadmin') {
+                return redirect('/superadmin/dashboard');
+            }
         }
 
         return view('pages.login');
@@ -40,7 +48,7 @@ class AuthController extends Controller
 
     public function showForgotPassword(): View
     {
-        return view('auth.forgot-password');
+        return view('pages.auth.forgot-password');
     }
 
     public function forgotPassword(ForgotPasswordRequest $request): RedirectResponse
@@ -79,7 +87,7 @@ class AuthController extends Controller
                 ->with('error', 'Token sudah kadaluarsa atau tidak valid.');
         }
 
-        return view('auth.reset-password', [
+        return view('pages.auth.reset-password', [
             'token' => $token,
             'email' => $email,
         ]);

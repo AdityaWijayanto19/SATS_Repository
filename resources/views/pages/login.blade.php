@@ -83,7 +83,7 @@
                     </div>
 
                     <div class="text-right mb-6">
-                    <a class="text-sm text-[#00a884] hover:cursor-pointer hover:underline">Lupa password?</a>
+                    <a href="{{ route('password.forgot') }}" class="text-sm text-[#00a884] hover:cursor-pointer hover:underline">Lupa password?</a>
                     </div>
 
                     <button type="submit"

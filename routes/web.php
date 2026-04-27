@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 
-// ================= AUTH =================
+// Auth Route
 Route::get('/login', [AuthController::class, 'viewLoginPage'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
 
@@ -14,21 +14,24 @@ Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name
 Route::get('/reset-password', [AuthController::class, 'showResetPassword'])
     ->name('password.reset')
     ->middleware('signed');
-
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 
-
-// ================= PROTECTED ROUTES =================
+// Protected Routes
 Route::middleware(['auth'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dashboard');
+    // Nakes Routes
+    Route::prefix('nakes')->middleware('role:nakes')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dashboard');
+        Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('input-data-pasien');
+        Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
+    });
 
-    // Input Data Pasien
-    Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('input-data-pasien');
-
-    // Laporan
-    Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
+    // Superadmin Routes
+    Route::prefix('superadmin')->middleware('role:superadmin')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('superadmin.dashboard');
+        Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('superadmin.input-data-pasien');
+        Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('superadmin.laporan');
+    });
 });
