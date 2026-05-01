@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LaporanController;
 
 // Auth Route
 Route::get('/login', [AuthController::class, 'viewLoginPage'])->name('login');
@@ -25,7 +26,9 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('nakes')->middleware('role:nakes')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dashboard');
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('input-data-pasien');
-        Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
+        // Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
+        Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
+        Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('laporan.pdf');
     });
 
     // Superadmin Routes
