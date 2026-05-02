@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Devices extends Model
+{
+    protected $table = 'devices';
+    protected $primaryKey = 'device_id';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    protected $fillable = [
+        'device_id',
+        'status',
+        'last_seen',
+    ];
+
+    public function sensorData()
+    {
+        return $this->hasMany(SensorData::class, 'device_id', 'device_id');
+    }
+
+    public function systemStatus()
+    {
+        return $this->hasOne(SystemStatus::class, 'device_id', 'device_id');
+    }
+
+    public function apiKeys()
+    {
+        return $this->hasMany(ApiKey::class, 'device_id', 'device_id');
+    }
+}
