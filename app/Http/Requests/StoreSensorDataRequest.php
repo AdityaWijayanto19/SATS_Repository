@@ -23,7 +23,6 @@ class StoreSensorDataRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'device_id'   => 'required|string|exists:devices,device_id',
             'heart_rate'  => 'nullable|integer|min:0|max:250',
             'spo2'        => 'nullable|integer|min:0|max:100',
             'temperature' => 'nullable|numeric|min:20|max:45',

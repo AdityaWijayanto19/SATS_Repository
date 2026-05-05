@@ -29,7 +29,7 @@ Route::post('/device/{device_id}/authenticate', [DeviceAuthController::class, 'a
  * - Require device_id in route parameter
  * - Optimized for minimal DB queries & caching
  */
-Route::prefix('device')->middleware('apikey')->group(function () {
+Route::prefix('device')->group(function () {
 
     /**
      * Get device configuration
@@ -42,7 +42,7 @@ Route::prefix('device')->middleware('apikey')->group(function () {
      */
     Route::prefix('/{device_id}/sensor-data')->group(function () {
         // Store sensor data dari device
-        Route::post('/', [DeviceAuthController::class, 'storeSensorData']);
+        Route::post('', [DeviceAuthController::class, 'storeSensorData']);
 
         // Get latest sensor data (cached)
         Route::get('/latest', [DeviceAuthController::class, 'getLatestSensorData']);

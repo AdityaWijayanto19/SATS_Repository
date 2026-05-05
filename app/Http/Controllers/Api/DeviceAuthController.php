@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSensorDataRequest;
 use App\Http\Requests\StoreSystemStatusRequest;
 use App\Services\DeviceService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class DeviceAuthController extends Controller
 {
@@ -52,7 +53,10 @@ class DeviceAuthController extends Controller
         $data = $request->validated();
         $data['device_id'] = $deviceId;
 
+        Log::info('Data masuk ke device: ' . $deviceId, $data);
+
         $sensorData = $this->deviceService->storeSensorData($data);
+
 
         return response()->json([
             'success' => true,

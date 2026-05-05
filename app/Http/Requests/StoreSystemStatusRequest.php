@@ -23,7 +23,6 @@ class StoreSystemStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'device_id' => 'required|string|exists:devices,device_id',
             'monitoring_status' => 'required|in:active,inactive',
             'battery_level' => 'nullable|integer|min:0|max:100',
             'signal_strength' => 'nullable|integer|min:0|max:100',

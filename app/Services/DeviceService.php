@@ -9,6 +9,7 @@ use App\Models\SystemStatus;
 use Carbon\Carbon;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class DeviceService
 {
@@ -25,6 +26,7 @@ class DeviceService
      */
     public function storeSensorData(array $data): SensorData
     {
+        Log::info('Service: mulai store sensor data', $data);
         // Bulk update device status (more efficient than separate update)
         Devices::where('device_id', $data['device_id'])
             ->update([
@@ -34,6 +36,10 @@ class DeviceService
 
         // Insert sensor data
         $sensorData = SensorData::create($data);
+
+        Log::info('Service: data berhasil disimpan', [
+            'id' => $sensorData->id
+        ]);
 
         // Clear cache untuk latest data device ini
         $this->clearLatestDataCache($data['device_id']);
