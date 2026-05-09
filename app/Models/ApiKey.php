@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class ApiKey extends Model
 {
@@ -32,34 +33,19 @@ class ApiKey extends Model
         return $this->belongsTo(Devices::class, 'device_id', 'device_id');
     }
 
-    /**
-     * Hash API key (call ini saat create)
-     * Usage: ApiKey::hashKey($plainKey)
-     */
     public static function hashKey(string $plainKey): string
     {
         return Hash::make($plainKey);
     }
 
-    /**
-     * Verify plain key terhadap hashed key
-     * Usage: $apiKey->verifyKey($plainKey)
-     */
     public function verifyKey(string $plainKey): bool
     {
         return Hash::check($plainKey, $this->key_hash);
     }
 
-    /**
-     * Find & validate API key
-     * Return: ApiKey|null (kalau valid & active)
-     * Optimized: timeout 5 detik untuk DB query
-     */
     public static function findValidKey(string $plainKey, string $deviceId)
     {
         try {
-            // Cari key untuk device ini yang active
-            // Optimize: select only needed columns
             $apiKey = self::select(['id', 'device_id', 'key_hash', 'is_active', 'expires_at'])
                 ->where('device_id', $deviceId)
                 ->where('is_active', true)
@@ -82,15 +68,11 @@ class ApiKey extends Model
 
             return $apiKey;
         } catch (\Exception $e) {
-            // Log error
-            \Log::error('ApiKey validation error: ' . $e->getMessage());
+            Log::error('ApiKey validation error: ' . $e->getMessage());
             return null;
         }
     }
 
-    /**
-     * Update last_used timestamp & IP (call saat device authenticate)
-     */
     public function updateLastUsed(string $ip = null): void
     {
         $this->update([

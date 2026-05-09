@@ -25,8 +25,8 @@ class StoreSensorDataRequest extends FormRequest
         return [
             'heart_rate'  => 'nullable|integer|min:0|max:250',
             'spo2'        => 'nullable|integer|min:0|max:100',
-            'temperature' => 'nullable|numeric|min:20|max:45',
-            'status'      => 'nullable|in:normal,warning,critical',
+            'temperature' => 'nullable|numeric|min:0|max:45',
+            'status'      => 'nullable|in:normal,warning,critical,no_finger',
             'prediction'  => 'nullable|string|max:50',
         ];
     }

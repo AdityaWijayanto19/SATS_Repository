@@ -34,10 +34,6 @@ class SensorData extends Model
         return $this->belongsTo(Devices::class, 'device_id', 'device_id');
     }
 
-    /**
-     * Scope: Get latest sensor data per device
-     * Performance: Uses index on (device_id, created_at)
-     */
     public function scopeLatest($query, $deviceId)
     {
         return $query->where('device_id', $deviceId)
@@ -45,10 +41,6 @@ class SensorData extends Model
             ->limit(1);
     }
 
-    /**
-     * Scope: Get data within time range
-     * Performance: Uses indexes for fast filtering
-     */
     public function scopeWithinRange($query, $deviceId, $from, $to)
     {
         return $query->where('device_id', $deviceId)
@@ -56,9 +48,6 @@ class SensorData extends Model
             ->orderByDesc('created_at');
     }
 
-    /**
-     * Scope: Select only needed columns (reduce memory)
-     */
     public function scopeOnlyVitals($query)
     {
         return $query->select(
@@ -80,10 +69,11 @@ class SensorData extends Model
     {
         return Attribute::make(
             get: fn($value) => match ($this->status) {
-                'critical' => '🔴 Critical',
-                'warning' => '🟡 Warning',
-                'normal' => '🟢 Normal',
-                default => '⚪ Unknown',
+                'critical' => 'Critical',
+                'warning' => 'Warning',
+                'normal' => 'Normal',
+                'no_finger' => 'No Finger',
+                default => 'No Finger',
             }
         );
     }

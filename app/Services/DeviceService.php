@@ -20,10 +20,6 @@ class DeviceService
         $this->cache = Cache::store('file'); // Fast local cache
     }
 
-    /**
-     * Store sensor data dari device
-     * Performance: Single insert, update device status in one query
-     */
     public function storeSensorData(array $data): SensorData
     {
         Log::info('Service: mulai store sensor data', $data);
@@ -47,10 +43,6 @@ class DeviceService
         return $sensorData;
     }
 
-    /**
-     * Get latest sensor data dengan caching
-     * Performance: Cache 5 menit, reduce DB queries 95%
-     */
     public function getLatestSensorData(string $deviceId): ?SensorData
     {
         $cacheKey = "latest_sensor_{$deviceId}";

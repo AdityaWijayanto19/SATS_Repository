@@ -27,12 +27,6 @@ class AuthService
 
         $user = Auth::guard('web')->user();
 
-        Log::info('User login', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'ip' => $request->ip()
-        ]);
-
         return [
             'user' => $user,
             'redirect' => $this->redirectByRole($user->role)
