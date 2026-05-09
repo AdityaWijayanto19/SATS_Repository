@@ -47,7 +47,10 @@ class LaporanController extends Controller
             'message'           => 'Kondisi pasien berpotensi memburuk 20% dalam 15 menit ke depan berdasarkan tren Heart Rate dan SpO2.',
         ];
 
-        return view('pages.nakes.laporan', compact(
+        $role = auth()->user()->role;
+        $viewFolder = $role === 'dokter' ? 'pages.dokter' : 'pages.nakes';
+
+        return view($viewFolder . '.laporan', compact(
             'pasien', 'vitalTerbaru', 'riwayat',
             'dari', 'sampai',
             'labelGrafik', 'dataSistolik', 'dataDiastolik',
@@ -94,7 +97,10 @@ class LaporanController extends Controller
         // ── Generate grafik via QuickChart.io ─────────────────────
         $grafikBase64 = $this->generateChartBase64($labels, $sistolik, $diastolik);
 
-        $pdf = Pdf::loadView('pages/nakes/laporan-pdf', compact(
+        $role = auth()->user()->role;
+        $viewFolder = $role === 'dokter' ? 'pages.dokter' : 'pages.nakes';
+
+        $pdf = Pdf::loadView($viewFolder . '/laporan-pdf', compact(
             'pasien', 'vitalTerbaru', 'riwayat',
             'dari', 'sampai', 'grafikBase64',
             'prediksi'
@@ -146,9 +152,24 @@ class LaporanController extends Controller
         $url = 'https://quickchart.io/chart?c=' . urlencode(json_encode($chartConfig)) . '&w=500&h=200&bkg=white';
 
         try {
-            $imageData = file_get_contents($url);
-            return $imageData ? base64_encode($imageData) : null;
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            $imageData = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $imageData && !$error) {
+                return base64_encode($imageData);
+            }
+
+            \Log::warning("QuickChart fetch failed: HTTP {$httpCode}, Error: {$error}");
+            return null;
         } catch (\Exception $e) {
+            \Log::warning('QuickChart exception: ' . $e->getMessage());
             return null;
         }
     }

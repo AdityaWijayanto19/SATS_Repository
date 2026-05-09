@@ -209,67 +209,39 @@
 
     </div>
 
-    {{-- ==================== KOMENTAR DOKTER (Nakes View) ==================== --}}
-    {{-- Container untuk nakes melihat dan merespon komentar dari dokter --}}
-    <div class="mt-4" x-data="komentarNakes()">
+    {{-- ==================== KOMENTAR DOKTER ==================== --}}
+    {{-- Container untuk dokter mengirim komentar/saran ke nakes di ambulans --}}
+    <div class="mt-4" x-data="komentarDokter()">
         <div class="bg-white rounded-xl border border-[rgba(0,83,63,0.1)] overflow-hidden">
             <div class="px-5 py-3.5 border-b border-[rgba(0,83,63,0.08)] flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-[rgb(0,62,48)]">Instruksi dari Dokter</p>
-                    <p class="text-[11px] text-gray-400 mt-0.5">Respon instruksi dan checklist yang sudah dilakukan</p>
+                    <p class="text-sm font-medium text-[rgb(0,62,48)]">Komentar untuk Nakes</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">Kirim instruksi atau saran terkait kondisi pasien</p>
                 </div>
-                <span class="text-[10px] font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full"
-                    x-text="komentar.filter(k => !k.checked).length + ' instruksi aktif'"></span>
+                <span class="text-[10px] font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full"
+                    x-text="komentar.length + ' komentar'"></span>
             </div>
 
-            {{-- Daftar komentar dari dokter --}}
+            {{-- Daftar komentar yang sudah dikirim --}}
             <div>
-                <template x-if="komentar.filter(k => !k.checked).length === 0">
-                    <p class="px-5 py-4 text-sm text-gray-400 text-center">Tidak ada instruksi dari dokter.</p>
+                <template x-if="komentar.length === 0">
+                    <p class="px-5 py-4 text-sm text-gray-400 text-center">Belum ada komentar.</p>
                 </template>
-                <template x-for="(item, index) in komentar" :key="item.id">
-                    <div x-show="!item.checked" class="px-5 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <template x-for="(item, index) in komentar" :key="index">
+                    <div class="px-5 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
                         <div class="flex items-start gap-3">
-                            {{-- Checklist --}}
-                            <label class="flex items-center gap-2 cursor-pointer mt-1 flex-shrink-0">
-                                <input type="checkbox" x-model="item.checked"
-                                    @change="checklistKomentar(item)"
-                                    class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
-                            </label>
-
-                            <div class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">D</div>
-
+                            <div class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">D</div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-xs font-semibold text-gray-700">Dr. Andi</span>
+                                    <span class="text-xs font-semibold text-gray-700">Anda</span>
                                     <span class="text-[10px] text-gray-400" x-text="item.waktu"></span>
                                 </div>
-                                <p class="text-sm text-gray-600 mb-2" x-text="item.teks"></p>
-
-                                {{-- Dropdown Respon --}}
-                                <div class="flex items-center gap-2" x-show="!item.respon">
-                                    <select x-model="item.selectedRespon"
-                                        class="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all">
-                                        <option value="" disabled selected>Pilih respon...</option>
-                                        <option value="Sudah dilakukan">Sudah dilakukan</option>
-                                        <option value="Tidak bisa dilakukan">Tidak bisa dilakukan</option>
-                                        <option value="Tidak memungkinkan">Tidak memungkinkan</option>
-                                        <option value="Sedang diproses">Sedang diproses</option>
-                                        <option value="Butuh konfirmasi ulang">Butuh konfirmasi ulang</option>
-                                    </select>
-                                    <button @click="kirimRespon(item)"
-                                        :disabled="!item.selectedRespon"
-                                        class="text-xs font-medium text-white px-3 py-1.5 rounded-lg cursor-pointer transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                                        style="background: rgb(0,83,63);">
-                                        Kirim
-                                    </button>
-                                </div>
-
-                                {{-- Tampilkan respon jika sudah dikirim --}}
+                                <p class="text-sm text-gray-600" x-text="item.teks"></p>
+                                {{-- Tampilkan respon nakes jika ada --}}
                                 <template x-if="item.respon">
-                                    <div class="mt-1.5 ml-0.5 pl-3 border-l-2 border-emerald-300 bg-emerald-50 rounded-r-lg py-1.5 px-3">
+                                    <div class="mt-2 ml-2 pl-3 border-l-2 border-emerald-300 bg-emerald-50 rounded-r-lg py-1.5 px-3">
                                         <div class="flex items-center gap-1.5 mb-0.5">
-                                            <span class="text-[10px] font-semibold text-emerald-700">Respon Anda</span>
+                                            <span class="text-[10px] font-semibold text-emerald-700">Respon Nakes</span>
                                             <span class="text-[10px] text-emerald-500" x-text="item.responWaktu"></span>
                                         </div>
                                         <p class="text-xs text-emerald-800" x-text="item.respon"></p>
@@ -279,6 +251,21 @@
                         </div>
                     </div>
                 </template>
+            </div>
+
+            {{-- Form kirim komentar --}}
+            <div class="px-5 py-3.5 border-t border-[rgba(0,83,63,0.08)] bg-gray-50/50">
+                {{-- TODO: Kirim ke backend (POST /api/komentar) --}}
+                <form @submit.prevent="kirimKomentar()" class="flex gap-3">
+                    <textarea x-model="teksBaru" rows="2" placeholder="Tulis komentar atau instruksi untuk nakes..."
+                        class="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all"
+                        required></textarea>
+                    <button type="submit"
+                        class="self-end px-5 py-2.5 text-sm font-medium text-white rounded-lg cursor-pointer transition-all hover:opacity-90 flex-shrink-0"
+                        style="background: rgb(0,83,63);">
+                        Kirim
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -439,49 +426,41 @@
         options: sharedOptions(35.0, 38.5)
     });
 
-    // ==================== KOMENTAR NAKES ====================
-    let komentarIdCounter = 100;
-    function komentarNakes() {
+    // ==================== KOMENTAR DOKTER ====================
+    function komentarDokter() {
         return {
-            // TODO: Ganti dengan data dari backend (fetch komentar dari dokter)
+            teksBaru: '',
+            // TODO: Ganti dengan data dari backend (fetch komentar yang sudah ada)
             komentar: [
                 {
-                    id: 1,
                     teks: 'Tolong pasang tabung oksigen, SpO2 pasien mulai turun.',
                     waktu: '10:15',
-                    respon: null,
-                    responWaktu: null,
-                    selectedRespon: '',
-                    checked: false
+                    respon: 'Sudah dilakukan',
+                    responWaktu: '10:18'
                 },
                 {
-                    id: 2,
                     teks: 'Monitor heart rate secara intensif, ada peningkatan signifikan.',
                     waktu: '10:20',
                     respon: null,
-                    responWaktu: null,
-                    selectedRespon: '',
-                    checked: false
+                    responWaktu: null
                 },
                 {
-                    id: 3,
                     teks: 'Siapkan infus saline 500ml, pasien dehidrasi.',
                     waktu: '10:30',
                     respon: null,
-                    responWaktu: null,
-                    selectedRespon: '',
-                    checked: false
+                    responWaktu: null
                 }
             ],
-            kirimRespon(item) {
-                if (!item.selectedRespon) return;
+            kirimKomentar() {
+                if (!this.teksBaru.trim()) return;
                 // TODO: POST ke backend
-                item.respon = item.selectedRespon;
-                item.responWaktu = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-            },
-            checklistKomentar(item) {
-                // TODO: POST ke backend (update status checked)
-                // Item akan otomatis tersembunyi karena x-show="!item.checked"
+                this.komentar.push({
+                    teks: this.teksBaru.trim(),
+                    waktu: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                    respon: null,
+                    responWaktu: null
+                });
+                this.teksBaru = '';
             }
         }
     }

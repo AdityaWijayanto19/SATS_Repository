@@ -15,6 +15,10 @@ class DashboardController extends Controller
             return "pages.nakes.$page";
         }
 
+        if ($role === 'dokter') {
+            return "pages.dokter.$page";
+        }
+
         if ($role === 'superadmin') {
             return "pages.superadmin.$page";
         }
@@ -25,6 +29,16 @@ class DashboardController extends Controller
     // Menampilkan halaman dashboard
     public function viewDashboardPage(){
         return view($this->getViewByRole('dashboard'));
+    }
+
+    // Menampilkan halaman manajemen alat (superadmin)
+    public function viewManajemenAlatPage(){
+        return view($this->getViewByRole('manajemen-alat'));
+    }
+
+    // Menampilkan halaman manajemen user (superadmin)
+    public function viewManajemenUserPage(){
+        return view($this->getViewByRole('manajemen-user'));
     }
 
     // Menampilkan halaman input data pasien

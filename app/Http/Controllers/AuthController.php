@@ -29,6 +29,10 @@ class AuthController extends Controller
                 return redirect('/nakes/dashboard');
             }
 
+            if ($user->role === 'dokter') {
+                return redirect('/dokter/dashboard');
+            }
+
             if ($user->role === 'superadmin') {
                 return redirect('/superadmin/dashboard');
             }

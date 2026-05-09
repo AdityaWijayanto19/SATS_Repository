@@ -22,10 +22,15 @@
                     clip-rule="evenodd" />
             </svg>
 
-            <!-- Name -->
-            <span class="text-md font-medium text-white/70">
-                {{ auth()->user()->name ?? 'Dr. User' }}
-            </span>
+            <!-- Name & Role -->
+            <div class="flex flex-col items-end">
+                <span class="text-md font-medium text-white/70">
+                    {{ auth()->user()->name ?? 'Dr. User' }}
+                </span>
+                <span class="text-xs font-medium text-white/40">
+                    {{ ucfirst(auth()->user()->role ?? 'nakes') }}
+                </span>
+            </div>
         </div>
 
         <!-- Logout -->

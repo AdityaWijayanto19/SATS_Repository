@@ -16,8 +16,8 @@
 ```
 resources/views/
   components/
-    navbar.blade.php          # Top nav (logo, user name, logout)
-    sidebar.blade.php         # Sidebar nakes (hardcoded, belum ada superadmin)
+    navbar.blade.php          # Top nav (logo, user name + role, logout)
+    sidebar.blade.php         # Sidebar dinamis (nakes/dokter/superadmin)
   layouts/
     app.blade.php             # Layout utama (navbar + sidebar + yield)
     auth.blade.php            # Layout halaman auth (login, forgot/reset password)
@@ -27,11 +27,21 @@ resources/views/
       forgot-password.blade.php
       reset-password.blade.php
     nakes/
-      dashboard.blade.php     # Monitoring device (chart, vital sign, prediksi ML)
+      dashboard.blade.php     # Monitoring device (chart, vital sign, prediksi ML, respon komentar)
       inputdata.blade.php     # Form input data pasien (belum ada backend)
       laporan.blade.php       # Laporan medis + chart + filter tanggal
       laporan-pdf.blade.php   # Template PDF laporan (DomPDF compatible)
-    superadmin/               # <<< BELUM ADA, PERLU DIBUAT
+    dokter/
+      dashboard.blade.php     # Monitoring device + container komentar untuk nakes
+      inputdata.blade.php     # Form input data pasien (sama seperti nakes)
+      laporan.blade.php       # Laporan medis (sama seperti nakes, role-aware)
+      laporan-pdf.blade.php   # Template PDF (sama seperti nakes, role-aware)
+    superadmin/
+      dashboard.blade.php     # Dashboard superadmin (stat cards, tabel kritis, log)
+      manajemen-alat.blade.php # Inventaris alat + modal tambah & detail alat
+      manajemen-user.blade.php # Manajemen user + modal tambah & detail user
+      laporan.blade.php       # Laporan superadmin (filter, stat cards, chart, tabel sensor)
+      laporan-pdf.blade.php   # Template PDF laporan superadmin (landscape A4)
 ```
 
 ---
@@ -41,9 +51,10 @@ resources/views/
 | Role       | URL Prefix       | Middleware         | Status         |
 |------------|------------------|--------------------|----------------|
 | nakes      | `/nakes/*`       | `role:nakes`       | Sudah ada view |
-| superadmin | `/superadmin/*`  | `role:superadmin`  | View belum ada |
+| dokter     | `/dokter/*`      | `role:dokter`      | Sudah ada view |
+| superadmin | `/superadmin/*`  | `role:superadmin`  | Sudah ada view |
 
-**Pembeda nakes umum & dokter:** Belum diimplementasikan. Saat ini semua nakes diperlakukan sama.
+**Pembeda nakes & dokter:** Halaman identik, dipisah route & folder untuk fitur tambahan (komentar dokter→nakes).
 
 ---
 
@@ -67,12 +78,23 @@ resources/views/
 | GET    | `/nakes/laporan`         | `laporan.index`    |
 | GET    | `/nakes/laporan/pdf`     | `laporan.pdf`      |
 
+### Dokter (auth + role:dokter)
+| Method | URI                       | Name                    |
+|--------|---------------------------|-------------------------|
+| GET    | `/dokter/dashboard`       | `dokter.dashboard`      |
+| GET    | `/dokter/input-data-pasien`| `dokter.input-data-pasien`|
+| GET    | `/dokter/laporan`         | `dokter.laporan`        |
+| GET    | `/dokter/laporan/pdf`     | `dokter.laporan.pdf`    |
+
 ### Superadmin (auth + role:superadmin)
-| Method | URI                            | Name                      |
-|--------|--------------------------------|---------------------------|
-| GET    | `/superadmin/dashboard`        | `superadmin.dashboard`    |
+| Method | URI                            | Name                        |
+|--------|--------------------------------|-----------------------------|
+| GET    | `/superadmin/dashboard`        | `superadmin.dashboard`      |
+| GET    | `/superadmin/manajemen-alat`   | `superadmin.manajemen-alat` |
+| GET    | `/superadmin/manajemen-user`   | `superadmin.manajemen-user` |
 | GET    | `/superadmin/input-data-pasien`| `superadmin.input-data-pasien` |
-| GET    | `/superadmin/laporan`          | `superadmin.laporan`      |
+| GET    | `/superadmin/laporan`          | `superadmin.laporan`        |
+| GET    | `/superadmin/laporan/pdf`      | `superadmin.laporan.pdf`    |
 
 ---
 
@@ -81,45 +103,64 @@ resources/views/
 ### Sudah Dikerjakan
 - [x] Halaman login + image slider
 - [x] Sistem auth (login, logout, forgot/reset password)
-- [x] Role middleware (nakes & superadmin)
-- [x] Dashboard nakes (hardcoded data, chart, vital sign)
-- [x] Input data pasien (UI form, belum ada backend POST)
-- [x] Laporan (HTML + PDF, data dummy)
+- [x] Role middleware (nakes, dokter, superadmin)
+- [x] Dashboard nakes (hardcoded data, chart, vital sign, prediksi ML)
+- [x] Input data pasien nakes (UI form, belum ada backend POST)
+- [x] Laporan nakes (HTML + PDF, data dummy)
 - [x] Navbar & sidebar nakes
+- [x] Dashboard dokter (monitoring + container komentar untuk nakes)
+- [x] Input data pasien dokter (UI form, sama seperti nakes)
+- [x] Laporan dokter (HTML + PDF, role-aware via LaporanController)
+- [x] Fitur komentar dokter→nakes (Alpine.js, dummy data)
+- [x] Fitur respon nakes (dropdown 5 opsi respon + checklist instruksi)
+- [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas)
+- [x] Sidebar dinamis (nakes/dokter/superadmin)
+- [x] Navbar menampilkan nama + role user
+- [x] Manajemen alat (tabel inventaris + modal tambah & detail alat)
+- [x] Manajemen user (tabel user + modal tambah & detail user)
+- [x] Laporan superadmin (filter, stat cards, chart 3 axis, tabel sensor, PDF)
+- [x] Seeder user dengan 3 role (`UserSeeder.php`)
+- [x] Auth redirect berdasarkan role (termasuk dokter)
 
 ### Belum Dikerjakan
-- [ ] **Dashboard superadmin** (view belum ada sama sekali)
-- [ ] **Sidebar superadmin** (saat ini sidebar hardcoded untuk nakes)
-- [ ] Pembeda role nakes umum & dokter
-- [ ] Fitur komentar/saran dokter
-- [ ] Fitur respon nakes (dropdown respon)
-- [ ] Model & migration: Pasien, VitalSign, RiwayatKondisi
+- [ ] Model & migration: Pasien, VitalSign, RiwayatKondisi, Device
 - [ ] Backend untuk input data pasien (POST route + controller)
+- [ ] Backend untuk manajemen alat (CRUD)
+- [ ] Backend untuk manajemen user (CRUD)
+- [ ] Backend untuk komentar dokter↔nakes (tabel, API, real-time)
 - [ ] Integrasi API (data real dari database)
-- [ ] Seeder user dengan role
+- [ ] Integrasi IoT (MQTT/HTTP ingestion)
+- [ ] Machine Learning (prediksi kondisi pasien)
 
 ---
 
-## Rencana Hari Ini (09 Mei 2026)
+## Fitur Komentar Dokter→Nakes
 
-### Fokus: Dashboard Superadmin
+### Alur:
+1. **Dokter** mengirim komentar/instruksi dari dashboard (textarea + tombol Kirim)
+2. **Nakes** melihat instruksi di dashboard dengan opsi respon (dropdown):
+   - Sudah dilakukan
+   - Tidak bisa dilakukan
+   - Tidak memungkinkan
+   - Sedang diproses
+   - Butuh konfirmasi ulang
+3. Nakes bisa checklist instruksi yang sudah selesai (disembunyikan dari daftar aktif)
+4. Dokter melihat respon nakes di bawah komentarnya (green border styling)
 
-**Target:** Membuat halaman dashboard superadmin dari nol.
-
-**Yang perlu dikerjakan:**
-1. Buat folder `resources/views/pages/superadmin/`
-2. Buat view dashboard superadmin (sesuai mockup/design)
-3. Buat sidebar khusus superadmin (atau buat sidebar dinamis berdasarkan role)
-4. Sesuaikan `DashboardController` jika diperlukan
-5. Pastikan route `/superadmin/dashboard` bisa diakses dengan benar
-
-> **Catatan:** Detail halaman & fitur superadmin akan diisi setelah melihat mockup/design.
+### Implementasi:
+- Menggunakan Alpine.js (`komentarDokter()` dan `komentarNakes()`)
+- Data dummy: 3 instruksi, 1 sudah ada respon
+- TODO: POST ke backend, real-time update via WebSocket
 
 ---
 
 ## Notes
 
 - Semua data di dashboard & laporan masih **hardcoded/dummy**
-- Sidebar `components/sidebar.blade.php` hanya untuk nakes, perlu dipisah atau dibuat dinamis
-- `config/roles.php` tidak konsisten dengan route (ada `admin` & `dokter` tapi tidak dipakai, `superadmin` tidak ada di config)
+- Sidebar `components/sidebar.blade.php` sudah dinamis berdasarkan role (nakes/dokter/superadmin)
+- Navbar menampilkan nama user + role (dengan `ucfirst()`)
+- `LaporanController` sudah role-aware: cek `auth()->user()->role` untuk pilih view folder
+- `DashboardController` sudah support 3 role di `getViewByRole()`
 - Form input data pasien belum punya backend handler
+- Manajemen alat & user: tombol Detail & Hapus belum berfungsi (belum ada backend)
+- Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)

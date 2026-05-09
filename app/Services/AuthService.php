@@ -43,6 +43,7 @@ class AuthService
     {
         return match($role) {
             'nakes'      => '/nakes/dashboard',
+            'dokter'     => '/dokter/dashboard',
             'superadmin' => '/superadmin/dashboard',
             default      => '/',
         };
