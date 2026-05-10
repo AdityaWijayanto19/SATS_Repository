@@ -150,6 +150,7 @@
 - Tabel `users`, `password_reset_tokens`, `sessions`, `cache`, `jobs`
 - Model `User.php`
 - Seeder `UserSeeder.php` (3 akun: superadmin, dokter, nakes)
+- Dokumentasi database lengkap di [DATABASE.md](DATABASE.md)
 
 **Belum ada:**
 - Model & migration: `Pasien`, `VitalSign`, `RiwayatKondisi`, `Device`
@@ -371,10 +372,48 @@ http://localhost:8000
 
 ---
 
-## Dokumentasi Terkait
+## Flow Sistem: Dari Pemasangan Hingga Rekam Medis
 
-- [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
+```
+Nakes memasang perangkat pada pasien
+        |
+        v
+Perangkat dinyalakan (via perangkat / dashboard monitoring)
+        |
+        v
+Perangkat mulai mengambil data sensor & mengirim ke database
+        |--- data masuk ke tabel sensor_data
+        |--- data ditampilkan real-time di dashboard
+        |
+        v
+Nakes di RS tujuan memantau kondisi pasien via dashboard
+        |
+        v
+Pasien tiba di RS tujuan --> Nakes mematikan perangkat
+        |--- perintah "stop" masuk ke tabel commands
+        |
+        v
+Nakes di ambulans menginput data pasien
+        |--- data masuk ke tabel patients
+        |
+        v
+Nakes melakukan cross-check di menu laporan
+        |--- pilih rentang tanggal/jam atau data vital terbaru
+        |
+        v
+Rekam medis ter-generate otomatis
+        |--- no rekam medis muncul di laporan
+        |--- data tersimpan di tabel medical_records
+        |--- laporan siap diunduh sebagai PDF
+```
 
 ---
 
-*Last updated: 10 Mei 2026, 00:00 WIB*
+## Dokumentasi Terkait
+
+- [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
+- [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
+
+---
+
+*Last updated: 10 Mei 2026*
