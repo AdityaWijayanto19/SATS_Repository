@@ -29,7 +29,7 @@ Route::post('/device/{device_id}/authenticate', [DeviceAuthController::class, 'a
  * - Require device_id in route parameter
  * - Optimized for minimal DB queries & caching
  */
-Route::prefix('device')->group(function () {
+Route::prefix('device')->middleware('apikey')->group(function () {
 
     /**
      * Get device configuration
@@ -43,9 +43,6 @@ Route::prefix('device')->group(function () {
     Route::prefix('/{device_id}/sensor-data')->group(function () {
         // Store sensor data dari device
         Route::post('', [DeviceAuthController::class, 'storeSensorData']);
-
-        // Get latest sensor data (cached)
-        Route::get('/latest', [DeviceAuthController::class, 'getLatestSensorData']);
     });
 
     /**
@@ -65,3 +62,9 @@ Route::prefix('device')->group(function () {
  * GET /api/sensor-data/{device_id}/latest
  */
 Route::get('/sensor-data/{device_id}/latest', [SensorDataController::class, 'latest']);
+
+/**
+ * Sensor data endpoints for dashboard (no API key needed, session auth)
+ */
+Route::get('/device/{device_id}/sensor-data/latest', [DeviceAuthController::class, 'getLatestSensorData']);
+Route::get('/device/{device_id}/sensor-data/history', [DeviceAuthController::class, 'getSensorDataHistory']);
