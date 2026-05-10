@@ -104,33 +104,36 @@ resources/views/
 - [x] Halaman login + image slider
 - [x] Sistem auth (login, logout, forgot/reset password)
 - [x] Role middleware (nakes, dokter, superadmin)
-- [x] Dashboard nakes (hardcoded data, chart, vital sign, prediksi ML)
+- [x] Dashboard nakes (terhubung ke API real, polling sensor data + komentar)
 - [x] Input data pasien nakes (UI form, belum ada backend POST)
 - [x] Laporan nakes (HTML + PDF, data dummy)
 - [x] Navbar & sidebar nakes
-- [x] Dashboard dokter (monitoring + container komentar untuk nakes)
+- [x] Dashboard dokter (terhubung ke API real, polling sensor data + komentar)
 - [x] Input data pasien dokter (UI form, sama seperti nakes)
 - [x] Laporan dokter (HTML + PDF, role-aware via LaporanController)
-- [x] Fitur komentar dokter→nakes (Alpine.js, dummy data)
+- [x] Fitur komentar dokter→nakes (terhubung ke API CommentController)
 - [x] Fitur respon nakes (dropdown 5 opsi respon + checklist instruksi)
 - [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas)
 - [x] Sidebar dinamis (nakes/dokter/superadmin)
 - [x] Navbar menampilkan nama + role user
-- [x] Manajemen alat (tabel inventaris + modal tambah & detail alat)
+- [x] Manajemen alat (CRUD terhubung ke backend, auto-generate API key)
 - [x] Manajemen user (tabel user + modal tambah & detail user)
 - [x] Laporan superadmin (filter, stat cards, chart 3 axis, tabel sensor, PDF)
 - [x] Seeder user dengan 3 role (`UserSeeder.php`)
 - [x] Auth redirect berdasarkan role (termasuk dokter)
+- [x] Bug fix: chart flickering (skip update jika data sama)
+- [x] Bug fix: komentar checklist reset (preserve state saat poll)
+- [x] Bug fix: polling interval seragam (5 detik)
+- [x] Fitur: dropdown device auto-update tanpa refresh
 
 ### Belum Dikerjakan
-- [ ] Model & migration: Pasien, VitalSign, RiwayatKondisi, Device
 - [ ] Backend untuk input data pasien (POST route + controller)
-- [ ] Backend untuk manajemen alat (CRUD)
-- [ ] Backend untuk manajemen user (CRUD)
-- [ ] Backend untuk komentar dokter↔nakes (tabel, API, real-time)
-- [ ] Integrasi API (data real dari database)
-- [ ] Integrasi IoT (MQTT/HTTP ingestion)
+- [ ] Route untuk UserController (CRUD user belum terhubung ke UI)
+- [ ] Laporan dari database (masih dummy data)
+- [ ] Integrasi IoT real (simulator sudah ada, hardware belum)
 - [ ] Machine Learning (prediksi kondisi pasien)
+- [ ] Notifikasi komentar terkirim (toast/snackbar)
+- [ ] Warning/highlight saat komentar dichecklist nakes
 
 ---
 
@@ -149,18 +152,23 @@ resources/views/
 
 ### Implementasi:
 - Menggunakan Alpine.js (`komentarDokter()` dan `komentarNakes()`)
-- Data dummy: 3 instruksi, 1 sudah ada respon
-- TODO: POST ke backend, real-time update via WebSocket
+- **Terhubung ke API:** GET/POST `/api/comments`, PATCH `/api/comments/{id}/respond`
+- Polling komentar setiap 5 detik
+- State checklist nakes di-preserve saat polling (menggunakan `_checkedIds` Set)
+- Dokter melihat respon nakes secara realtime
 
 ---
 
 ## Notes
 
-- Semua data di dashboard & laporan masih **hardcoded/dummy**
+- Dashboard nakes & dokter **terhubung ke API real** (polling 5 detik)
+- Dropdown device **auto-update** tanpa refresh halaman (polling `/api/devices` 10 detik)
 - Sidebar `components/sidebar.blade.php` sudah dinamis berdasarkan role (nakes/dokter/superadmin)
 - Navbar menampilkan nama user + role (dengan `ucfirst()`)
 - `LaporanController` sudah role-aware: cek `auth()->user()->role` untuk pilih view folder
 - `DashboardController` sudah support 3 role di `getViewByRole()`
 - Form input data pasien belum punya backend handler
-- Manajemen alat & user: tombol Detail & Hapus belum berfungsi (belum ada backend)
+- Manajemen alat: CRUD sudah terhubung ke backend
+- Manajemen user: UI ada, backend ada, route belum didaftarkan
 - Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)
+- Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware

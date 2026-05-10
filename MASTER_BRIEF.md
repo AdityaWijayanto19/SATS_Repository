@@ -69,22 +69,24 @@
 - Role middleware (`nakes`, `dokter`, `superadmin`)
 - Redirect berdasarkan role setelah login (AuthService + AuthController)
 
-### 2. Dashboard Nakes [UI SELESAI, DATA DUMMY]
+### 2. Dashboard Nakes [TERHUBUNG KE API]
 
-- Dropdown perangkat (3 device hardcoded: Sats Wearable-1/2/3)
+- Dropdown perangkat (polling `/api/devices` setiap 10 detik, auto-update tanpa refresh)
 - 4 kartu statistik: Heart Rate, SpO2, Suhu, Kondisi Pasien
-- Banner prediksi ML (hardcoded: 20% risk, 15 menit)
-- 3 grafik real-time Chart.js (Heart Rate, SpO2, Suhu)
+- Banner prediksi ML (dari database, fallback "Data prediksi belum tersedia")
+- 3 grafik real-time Chart.js (polling setiap 5 detik, skip update jika data sama)
 - Container respon instruksi dokter (dropdown 5 opsi + checklist)
-- **Belum terhubung ke database/API real**
+- State checklist komentar tetap terjaga saat polling
+- **Terhubung ke API real (sensor-data/latest, sensor-data/history, comments)**
 
-### 3. Dashboard Dokter [UI SELESAI, DATA DUMMY]
+### 3. Dashboard Dokter [TERHUBUNG KE API]
 
 - Identik dengan dashboard nakes (monitoring, chart, vital sign)
 - Container komentar untuk nakes (textarea + kirim)
 - Daftar komentar terkirim dengan timestamp
 - Tampilan respon nakes (green border, label "Respon Nakes")
-- **Belum terhubung ke backend**
+- Polling komentar setiap 5 detik
+- **Terhubung ke API real (comments, sensor-data)**
 
 ### 4. Input Data Pasien [UI SELESAI, BELUM ADA BACKEND]
 
@@ -110,20 +112,22 @@
 - Log Aktivitas Terbaru (timeline dengan indikator warna)
 - **Belum terhubung ke database real**
 
-### 7. Manajemen Alat (Superadmin) [UI SELESAI, DATA DUMMY]
+### 7. Manajemen Alat (Superadmin) [TERHUBUNG KE BACKEND]
 
-- Tabel inventaris 9 perangkat SATS Wearable (DEV-001 s/d DEV-009)
+- Tabel inventaris perangkat (data dari database)
 - Modal "+ Daftar Alat" (input ID & Nama Perangkat)
 - Modal Detail per perangkat (ikon, nama, ID, status, urgensi, tgl daftar, terakhir aktif, lokasi)
-- **Belum ada backend CRUD**
+- CRUD: tambah device, lihat detail, hapus device
+- Auto-generate API key saat registrasi device (ditampilkan sekali)
+- **Backend: ManajemenAlatController (store, show, destroy)**
 
-### 8. Manajemen User (Superadmin) [UI SELESAI, DATA DUMMY]
+### 8. Manajemen User (Superadmin) [UI SELESAI, BELUM ADA ROUTE]
 
-- Tabel 5 pengguna (No, Nama, Peran, Status, Email)
+- Tabel pengguna (data dari database)
 - Badge peran berwarna: Super Admin (ungu), Dokter (biru), Perawat (pink)
 - Modal "+ Tambah User" (ID, Nama, Peran dropdown, Email)
 - Modal Detail user (avatar, role badge, telepon, tgl bergabung)
-- **Belum ada backend CRUD**
+- **Backend: UserController sudah ada (store, update, destroy), belum ada route di web.php**
 
 ### 9. Laporan Superadmin [UI SELESAI, DATA DUMMY]
 
@@ -144,31 +148,45 @@
 - Active state menggunakan `request()->routeIs()`
 - Navbar: logo + nama user + role + tombol logout
 
-### 11. Backend & Database [SEBAGIAN BESAR BELUM ADA]
+### 11. Backend & Database [SEBAGIAN BESAR SELESAI]
 
 **Sudah ada:**
-- Tabel `users`, `password_reset_tokens`, `sessions`, `cache`, `jobs`
-- Model `User.php`
-- Seeder `UserSeeder.php` (3 akun: superadmin, dokter, nakes)
-- Dokumentasi database lengkap di [DATABASE.md](DATABASE.md)
+- 12 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, commands, activity_log, comments, cache, jobs)
+- 10 model Eloquent dengan relasi lengkap
+- 3 service layer: AuthService, DeviceService, UserService
+- 7 form request validation
+- API sensor data (POST, GET latest, GET history)
+- API komentar (GET, POST, PATCH respond)
+- API device list (`/api/devices`)
+- API system status (POST, GET)
+- Autentikasi device via API key
+- Seeder: 3 user + 2 device + 2 API key
+- Dokumentasi: [DATABASE.md](DATABASE.md), [BACKEND.md](BACKEND.md)
 
 **Belum ada:**
-- Model & migration: `Pasien`, `VitalSign`, `RiwayatKondisi`, `Device`
-- API endpoints untuk IoT data ingestion
-- Backend handler untuk input data pasien
-- Backend CRUD untuk manajemen alat & user
-- Backend untuk komentar dokter↔nakes
+- Backend input data pasien (POST handler)
+- Route untuk UserController (CRUD user belum terhubung ke UI)
+- Laporan dari database (masih dummy data)
+- Device config dari database (masih hardcoded)
+- Commands controller (start/stop device)
+- Activity log controller
+- Integrasi ML
 
-### 12. Integrasi IoT [BELUM ADA DI REPO]
+### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
 
-Kode Arduino/IoT berada di luar repo ini. Rencana alur data:
-- Device mengirim data via MQTT/HTTP POST ke `/api/ingest`
-- Payload: `{ device_id, heart_rate, spo2, temperature, timestamp }`
-- API endpoints:
-  - `GET /api/device/{device_id}/latest`
-  - `GET /api/device/{device_id}/history?minutes=10`
-  - `GET /api/device/{device_id}/prediction`
-- Real-time: HTTP polling (10 detik) atau WebSocket (Laravel Echo + Pusher)
+Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware.
+
+**Alur data (sudah jalan):**
+- Simulator → POST `/api/device/{id}/sensor-data` → database → dashboard polling
+- Simulator → POST `/api/device/{id}/system-status` → database
+
+**Alur data (rencana hardware):**
+- Device mengirim data via HTTP POST ke endpoint yang sama
+- Payload: `{ heart_rate, spo2, temperature }`
+- API endpoints (sudah ada):
+  - `GET /api/device/{device_id}/sensor-data/latest`
+  - `GET /api/device/{device_id}/sensor-data/history?minutes=10`
+  - `GET /api/device/{device_id}/system-status`
 
 ### 13. Machine Learning [BELUM ADA]
 
@@ -180,24 +198,88 @@ Direncanakan ditambahkan di akhir project. Fitur:
 
 ---
 
+## Rencana Perbaikan & Pengembangan
+
+### Prioritas 1 — Realtime & Delay Fix
+- [ ] Kurangi delay pengiriman data simulator → dashboard
+- [ ] Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif
+- [ ] Kurangi atau hapus cache TTL pada DeviceService (saat ini 5 menit)
+- [ ] Pastikan data simulator langsung terlihat di dashboard tanpa delay signifikan
+
+### Prioritas 2 — Notifikasi & Feedback UI
+- [ ] Notifikasi "Komentar terkirim" saat dokter mengirim komentar (toast/snackbar)
+- [ ] Warning/highlight saat komentar dichecklist nakes (badge atau animasi)
+- [ ] Badge counter komentar aktif di sidebar nakes
+- [ ] Notifikasi realtime saat ada komentar baru masuk
+
+### Prioritas 3 — Backend yang Belum Selesai
+- [ ] Backend input data pasien (POST route + controller → tabel `patients`)
+- [ ] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
+- [ ] Aktifkan query database di LaporanController (ganti dummy data)
+- [ ] Aktifkan query database di SuperadminLaporanController (ganti dummy data)
+- [ ] Device config dari database (ganti hardcoded)
+- [ ] Commands controller (start/stop device)
+- [ ] Activity log: tulis log di setiap aksi penting
+
+### Prioritas 4 — Integrasi & Testing
+- [ ] Testing dengan hardware IoT real
+- [ ] Konfigurasi HTTP POST pada device Arduino
+- [ ] Stress testing API endpoint
+- [ ] Validasi data sensor (toleransi outlier)
+
+### Prioritas 5 — Machine Learning
+- [ ] Training model prediksi kondisi pasien
+- [ ] Integrasi model ke pipeline data
+- [ ] Endpoint prediksi
+- [ ] Tampilkan prediksi di dashboard dan laporan
+
+---
+
 ## Struktur File Utama
 
 ```
 app/Http/Controllers/
   AuthController.php              # Login, logout, forgot/reset password
-  DashboardController.php         # Role-based view resolver (3 role)
+  DashboardController.php         # Role-based view resolver + API device list
+  UserController.php              # CRUD user (superadmin)
+  ManajemenAlatController.php     # CRUD perangkat IoT (superadmin)
   LaporanController.php           # Laporan HTML + PDF nakes/dokter (role-aware)
   SuperadminLaporanController.php # Laporan HTML + PDF superadmin
+  Api/
+    DeviceAuthController.php      # Autentikasi device, sensor data, system status
+    SensorDataController.php      # Legacy sensor data endpoint
+    CommentController.php         # Komentar dokter-nakes
 
 app/Services/
   AuthService.php                 # Business logic autentikasi + redirect role
+  DeviceService.php               # Sensor data CRUD + caching
+  UserService.php                 # User CRUD
 
 app/Http/Middleware/
   RoleMiddleware.php              # Cek role user
+  AuthenticateApiKey.php          # Validasi API key device IoT
+
+app/Models/
+  User.php                        # users
+  Devices.php                     # devices (PK: device_id string)
+  SensorData.php                  # sensor_datas
+  SystemStatus.php                # system_statuses
+  ApiKey.php                      # api_keys
+  Patient.php                     # patients
+  MedicalRecord.php               # medical_records
+  Command.php                     # commands
+  ActivityLog.php                 # activity_log
+  Comment.php                     # comments
 
 database/seeders/
   UserSeeder.php                  # 3 akun: superadmin, dokter, nakes
-  DatabaseSeeder.php              # Memanggil UserSeeder
+  DeviceSeeder.php                # 2 device + 2 API key
+  DatabaseSeeder.php              # Memanggil UserSeeder + DeviceSeeder
+
+simulasi_py/
+  config.py                       # Konfigurasi simulator
+  simulator.py                    # Simulator IoT device (Python)
+  requirements.txt                # Dependency: requests
 
 resources/views/
   components/
@@ -210,18 +292,18 @@ resources/views/
     login.blade.php               # Login + image slider
     auth/                         # Forgot & reset password
     nakes/
-      dashboard.blade.php         # Monitoring + respon instruksi dokter
+      dashboard.blade.php         # Monitoring + respon instruksi dokter (API-connected)
       inputdata.blade.php         # Form input pasien
       laporan.blade.php           # Laporan medis + chart
       laporan-pdf.blade.php       # Template PDF
     dokter/
-      dashboard.blade.php         # Monitoring + komentar untuk nakes
+      dashboard.blade.php         # Monitoring + komentar untuk nakes (API-connected)
       inputdata.blade.php         # Form input pasien
       laporan.blade.php           # Laporan medis + chart
       laporan-pdf.blade.php       # Template PDF
     superadmin/
       dashboard.blade.php         # Stat cards, tabel kritis, log aktivitas
-      manajemen-alat.blade.php    # Inventaris alat + modal
+      manajemen-alat.blade.php    # Inventaris alat + modal (CRUD active)
       manajemen-user.blade.php    # Manajemen user + modal
       laporan.blade.php           # Laporan + chart + tabel sensor
       laporan-pdf.blade.php       # Template PDF landscape
@@ -240,6 +322,7 @@ resources/views/
 | Node.js | 18+ | Untuk Vite & Tailwind |
 | MySQL | 8.x | Database utama |
 | Git |任意 | Clone repo |
+| Python | 3.8+ | Opsional, untuk menjalankan simulator IoT |
 
 > **Rekomendasi:** Gunakan [Laragon](https://laragon.org/) (Windows) karena sudah include PHP, MySQL, dan auto virtual host.
 
@@ -306,15 +389,16 @@ CREATE DATABASE sats_db;
 #### 6. Jalankan Migration & Seeder
 
 ```bash
-# Buat semua tabel
-php artisan migrate
-
-# Isi data awal (3 akun user)
-php artisan db:seed
+# Buat semua tabel + isi data awal
+php artisan migrate --seed
 ```
 
 Data yang di-seed:
 - Tabel `users` dengan 3 akun (superadmin, dokter, nakes)
+- Tabel `devices` dengan 2 device (`DEVICE_01`, `DEVICE_02`)
+- Tabel `api_keys` dengan 2 API key (hashed) untuk masing-masing device
+
+> **Catatan:** Jika tabel sudah ada, gunakan `php artisan migrate:fresh --seed` untuk reset ulang.
 
 #### 7. Jalankan Development Server
 
@@ -338,7 +422,38 @@ php artisan serve
 http://localhost:8000
 ```
 
-### Akun Login (Setelah Seed)
+#### 9. Jalankan Simulator (Opsional)
+
+Simulator Python mengirim data sensor ke API untuk testing tanpa hardware IoT.
+
+```bash
+# Masuk ke folder simulator
+cd simulasi_py
+
+# Install dependency Python
+pip install -r requirements.txt
+
+# Jalankan simulator (gunakan device & API key dari seeder)
+python simulator.py --device DEVICE_01 --key test_key_device_01
+```
+
+> Simulator akan mengirim data sensor setiap 5 detik ke API.
+> Data akan muncul real-time di dashboard nakes/dokter.
+> Buka simulator di terminal terpisah (total 3 terminal: Vite, Laravel, Simulator).
+
+**Menjalankan banyak device sekaligus:**
+```bash
+# Terminal 3 — Device 1
+python simulator.py --device DEVICE_01 --key test_key_device_01
+
+# Terminal 4 — Device 2
+python simulator.py --device DEVICE_02 --key test_key_device_02
+```
+
+**Konfigurasi simulator** (`simulasi_py/config.py`):
+- `DEVICE_ID` — ID device yang di-simulasikan
+- `API_KEY` — API key device
+- `SEND_INTERVAL` — Interval pengiriman data (detik, default 5)
 
 | Role | Email | Password | Dashboard |
 |------|-------|----------|-----------|
@@ -358,6 +473,10 @@ http://localhost:8000
 | CSS/JS tidak ter-load | Pastikan `npm run dev` berjalan di terminal terpisah |
 | `Vite manifest not found` | Jalankan `npm run build` atau `npm run dev` |
 | Migration error `table already exists` | Jalankan `php artisan migrate:fresh --seed` (hapus semua tabel & seed ulang) |
+| Simulator `ModuleNotFoundError` | Jalankan `pip install -r requirements.txt` di folder `simulasi_py/` |
+| Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
+| Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed di database |
+| Dashboard tidak update | Pastikan simulator berjalan, cek polling interval (5 detik) |
 
 ---
 
@@ -366,7 +485,7 @@ http://localhost:8000
 | Anggota      | Role      | Cakupan Kerja                        |
 |--------------|-----------|--------------------------------------|
 | Dalvero      | Frontend  | UI/UX Blade templates, chart, layout |
-| (Anggota lain)| Backend  | API, database, integrasi IoT, ML     |
+| Aditya       | Backend   | API, database, integrasi IoT, ML     |
 
 > Catatan: FRONTEND.md adalah dokumentasi progress dari sisi frontend (Dalvero).
 
@@ -412,6 +531,7 @@ Rekam medis ter-generate otomatis
 ## Dokumentasi Terkait
 
 - [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
+- [BACKEND.md](BACKEND.md) - Detail progress backend, API endpoints, service layer, dan simulator
 - [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
 
 ---

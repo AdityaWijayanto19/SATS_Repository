@@ -5,6 +5,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\SuperadminLaporanController;
+use App\Http\Controllers\ManajemenAlatController;
+use App\Http\Controllers\Api\CommentController;
 
 // Auth Route
 Route::get('/login', [AuthController::class, 'viewLoginPage'])->name('login');
@@ -43,10 +45,21 @@ Route::middleware(['auth'])->group(function () {
     // Superadmin Routes
     Route::prefix('superadmin')->middleware('role:superadmin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('superadmin.dashboard');
-        Route::get('/manajemen-alat', [DashboardController::class, 'viewManajemenAlatPage'])->name('superadmin.manajemen-alat');
+        Route::get('/manajemen-alat', [ManajemenAlatController::class, 'index'])->name('superadmin.manajemen-alat');
+        Route::post('/manajemen-alat', [ManajemenAlatController::class, 'store'])->name('superadmin.manajemen-alat.store');
+        Route::delete('/manajemen-alat/{device_id}', [ManajemenAlatController::class, 'destroy'])->name('superadmin.manajemen-alat.destroy');
+        Route::get('/manajemen-alat/{device_id}', [ManajemenAlatController::class, 'show'])->name('superadmin.manajemen-alat.show');
         Route::get('/manajemen-user', [DashboardController::class, 'viewManajemenUserPage'])->name('superadmin.manajemen-user');
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('superadmin.input-data-pasien');
         Route::get('/laporan', [SuperadminLaporanController::class, 'index'])->name('superadmin.laporan');
         Route::get('/laporan/pdf', [SuperadminLaporanController::class, 'pdf'])->name('superadmin.laporan.pdf');
     });
+
+    // Comment endpoints (accessible by dokter & nakes)
+    Route::get('/api/comments', [CommentController::class, 'index']);
+    Route::post('/api/comments', [CommentController::class, 'store']);
+    Route::patch('/api/comments/{comment}/respond', [CommentController::class, 'respond']);
+
+    // Device list endpoint (for dashboard polling)
+    Route::get('/api/devices', [DashboardController::class, 'getDevicesApi']);
 });

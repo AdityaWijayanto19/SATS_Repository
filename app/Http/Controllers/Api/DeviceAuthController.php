@@ -192,4 +192,30 @@ class DeviceAuthController extends Controller
             ],
         ], 200);
     }
+
+    /**
+     * Get sensor data history for charts
+     * GET /api/device/{device_id}/sensor-data/history?minutes=10
+     */
+    public function getSensorDataHistory(string $deviceId): JsonResponse
+    {
+        $minutes = (int) request('minutes', 10);
+        $from = now()->subMinutes($minutes);
+
+        $data = \App\Models\SensorData::where('device_id', $deviceId)
+            ->where('created_at', '>=', $from)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'labels' => $data->map(fn($d) => $d->created_at->format('H:i')),
+                'heart_rate' => $data->pluck('heart_rate'),
+                'spo2' => $data->pluck('spo2'),
+                'temperature' => $data->pluck('temperature'),
+                'status' => $data->pluck('status'),
+            ],
+        ], 200);
+    }
 }

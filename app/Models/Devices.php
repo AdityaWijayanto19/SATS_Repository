@@ -31,4 +31,19 @@ class Devices extends Model
     {
         return $this->hasMany(ApiKey::class, 'device_id', 'device_id');
     }
+
+    public function patients()
+    {
+        return $this->hasMany(Patient::class, 'device_id', 'device_id');
+    }
+
+    public function medicalRecords()
+    {
+        return $this->hasMany(MedicalRecord::class, 'device_id', 'device_id');
+    }
+
+    public function commands()
+    {
+        return $this->hasMany(Command::class, 'device_id', 'device_id');
+    }
 }
