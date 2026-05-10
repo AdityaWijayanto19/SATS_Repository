@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSensorDataRequest;
 use App\Http\Requests\StoreSystemStatusRequest;
+use App\Jobs\ProcessSensorData;
 use App\Services\DeviceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -53,20 +54,20 @@ class DeviceAuthController extends Controller
         $data = $request->validated();
         $data['device_id'] = $deviceId;
 
-        Log::info('Data masuk ke device: ' . $deviceId, $data);
+        $start = microtime(true);
 
-        $sensorData = $this->deviceService->storeSensorData($data);
+        ProcessSensorData::dispatch($data);
 
+        $duration = round((microtime(true) - $start) * 1000, 2);
+
+        Log::info('API response time', [
+            'duration_ms' => $duration,
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Sensor data stored successfully',
-            'data' => [
-                'id' => $sensorData->id,
-                'device_id' => $sensorData->device_id,
-                'created_at' => $sensorData->created_at,
-            ],
-        ], 201);
+            'message' => 'Sensor data queued successfully',
+        ], 202);
     }
 
     /**

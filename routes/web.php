@@ -2,10 +2,22 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use Illuminate\Support\Facades\Redis;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+
+Route::get('/cek-redis', function () {
+    try {
+        Redis::set('cek_koneksi', 'Redis Berhasil Terkoneksi!');
+        return Redis::get('cek_koneksi');
+    } catch (\Exception $e) {
+        return "Redis Eror: " . $e->getMessage();
+    }
+});
+
 
 Route::get('/login', [AuthController::class, 'viewLoginPage'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.process');
