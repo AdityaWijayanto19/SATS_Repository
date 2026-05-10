@@ -228,6 +228,138 @@ resources/views/
 
 ---
 
+## Panduan Setup (Clone & Jalankan di Laptop Lain)
+
+### Prasyarat
+
+| Software | Versi Minimum | Keterangan |
+|----------|---------------|------------|
+| PHP | 8.2+ | Sudah include di Laragon/XAMPP |
+| Composer | 2.x | Dependency manager PHP |
+| Node.js | 18+ | Untuk Vite & Tailwind |
+| MySQL | 8.x | Database utama |
+| Git |任意 | Clone repo |
+
+> **Rekomendasi:** Gunakan [Laragon](https://laragon.org/) (Windows) karena sudah include PHP, MySQL, dan auto virtual host.
+
+### Step-by-Step
+
+#### 1. Clone Repository
+
+```bash
+git clone https://github.com/AdityaWijayanto19/SATS_Repository.git
+cd SATS_Repository
+```
+
+#### 2. Install Dependencies
+
+```bash
+# Install PHP dependencies
+composer install
+
+# Install JS dependencies
+npm install
+```
+
+#### 3. Setup Environment
+
+```bash
+# Copy file env
+cp .env.example .env
+
+# Generate key aplikasi
+php artisan key:generate
+```
+
+#### 4. Konfigurasi Database di `.env`
+
+Buka file `.env`, ubah bagian database dari SQLite ke MySQL:
+
+```env
+# Comment/hapus baris SQLite
+# DB_CONNECTION=sqlite
+
+# Tambahkan konfigurasi MySQL
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sats_db
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+> **Catatan Laragon:** Username default `root`, password kosong.
+> **Catatan XAMPP:** Username default `root`, password kosong.
+> Pastikan database `sats_db` sudah dibuat di MySQL (bisa via phpMyAdmin atau Laragon auto-create).
+
+#### 5. Buat Database (jika belum ada)
+
+Buka phpMyAdmin atau MySQL CLI:
+
+```sql
+CREATE DATABASE sats_db;
+```
+
+> Di Laragon, database akan otomatis terbuat saat pertama kali diakses jika nama database ditulis di `.env`.
+
+#### 6. Jalankan Migration & Seeder
+
+```bash
+# Buat semua tabel
+php artisan migrate
+
+# Isi data awal (3 akun user)
+php artisan db:seed
+```
+
+Data yang di-seed:
+- Tabel `users` dengan 3 akun (superadmin, dokter, nakes)
+
+#### 7. Jalankan Development Server
+
+Buka **2 terminal** secara bersamaan:
+
+**Terminal 1 — Vite (Tailwind CSS & hot reload):**
+```bash
+npm run dev
+```
+
+**Terminal 2 — Laravel server:**
+```bash
+php artisan serve
+```
+
+> Atau jika menggunakan Laragon, akses langsung: `http://sats-repository.test`
+
+#### 8. Buka di Browser
+
+```
+http://localhost:8000
+```
+
+### Akun Login (Setelah Seed)
+
+| Role | Email | Password | Dashboard |
+|------|-------|----------|-----------|
+| Super Admin | `admin@sats.id` | `password` | `/superadmin/dashboard` |
+| Dokter | `andi@sats.id` | `password` | `/dokter/dashboard` |
+| Nakes (Perawat) | `rina@sats.id` | `password` | `/nakes/dashboard` |
+
+### Troubleshooting Umum
+
+| Masalah | Solusi |
+|---------|--------|
+| `composer install` error | Jalankan `composer update` atau pastikan PHP 8.2+ (`php -v`) |
+| `npm install` error | Pastikan Node.js 18+ terinstall (`node -v`), coba `npm install --force` |
+| `No application encryption key` | Jalankan `php artisan key:generate` |
+| `SQLSTATE` connection error | Cek MySQL berjalan, cek konfigurasi DB di `.env` |
+| Halaman kosong/blank | Cek `storage/logs/laravel.log`, pastikan `npm run dev` berjalan |
+| CSS/JS tidak ter-load | Pastikan `npm run dev` berjalan di terminal terpisah |
+| `Vite manifest not found` | Jalankan `npm run build` atau `npm run dev` |
+| Migration error `table already exists` | Jalankan `php artisan migrate:fresh --seed` (hapus semua tabel & seed ulang) |
+
+---
+
 ## Role & Pembagian Kerja
 
 | Anggota      | Role      | Cakupan Kerja                        |
@@ -245,4 +377,4 @@ resources/views/
 
 ---
 
-*Last updated: 09 Mei 2026, 23:00 WIB*
+*Last updated: 10 Mei 2026, 00:00 WIB*
