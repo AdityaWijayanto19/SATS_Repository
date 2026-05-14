@@ -1,70 +1,39 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\DeviceAuthController;
+use App\Http\Controllers\Api\DeviceDataController;
 use App\Http\Controllers\Api\SensorDataController;
+use App\Http\Controllers\Api\InstructionController;
 
-/**
- * Health check endpoint
- */
-Route::get('/', function () {
-    return response()->json([
-        'message' => 'API SATS running',
-        'version' => '1.0.0',
-        'timestamp' => now(),
-    ]);
-});
 
-/**
- * Device Authenticate Endpoint (Public, requires API key only)
- * POST /api/device/{device_id}/authenticate
- */
-Route::post('/device/{device_id}/authenticate', [DeviceAuthController::class, 'authenticate'])->middleware('apikey');
+Route::post('/device/{device_id}/authenticate', [DeviceDataController::class, 'authenticate'])->middleware('apikey');
 
-/**
- * Device Communication Routes (Protected)
- *
- * All endpoints:
- * - Require X-API-Key header
- * - Require device_id in route parameter
- * - Optimized for minimal DB queries & caching
- */
 Route::prefix('device')->middleware('apikey')->group(function () {
 
-    /**
-     * Get device configuration
-     * GET /api/device/{device_id}/config
-     */
-    Route::get('/{device_id}/config', [DeviceAuthController::class, 'getDeviceConfig']);
+    Route::get('/{device_id}/config', [DeviceDataController::class, 'getDeviceConfig']);
 
-    /**
-     * Sensor Data Endpoints
-     */
     Route::prefix('/{device_id}/sensor-data')->group(function () {
-        // Store sensor data dari device
-        Route::post('', [DeviceAuthController::class, 'storeSensorData']);
+        Route::post('', [SensorDataController::class, 'storeSensorData']);
+        Route::get('/latest', [SensorDataController::class, 'getLatestSensorData']);
+        Route::get('/history', [SensorDataController::class, 'getSensorDataHistory']);
     });
 
-    /**
-     * System Status Endpoints
-     */
     Route::prefix('/{device_id}/system-status')->group(function () {
-        // Store system status (battery, signal)
-        Route::post('/', [DeviceAuthController::class, 'storeSystemStatus']);
-
-        // Get system status (cached)
-        Route::get('/', [DeviceAuthController::class, 'getSystemStatus']);
+        Route::post('/', [DeviceDataController::class, 'storeSystemStatus']);
+        Route::get('/', [DeviceDataController::class, 'getSystemStatus']);
     });
 });
 
-/**
- * Legacy SensorData endpoint (for backward compatibility)
- * GET /api/sensor-data/{device_id}/latest
- */
-Route::get('/sensor-data/{device_id}/latest', [SensorDataController::class, 'latest']);
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::prefix('instruction')->group(function () {
+        Route::get('', [InstructionController::class, 'index']);
+        Route::post('', [InstructionController::class, 'store']);
+        Route::post('/report', [InstructionController::class, 'storeReport']);
+        Route::patch('/{instruction}', [InstructionController::class, 'update']);
+        Route::patch('/{instruction}/complete', [InstructionController::class, 'complete']);
+    });
 
-/**
- * Sensor data endpoints for dashboard (no API key needed, session auth)
- */
-Route::get('/device/{device_id}/sensor-data/latest', [DeviceAuthController::class, 'getLatestSensorData']);
-Route::get('/device/{device_id}/sensor-data/history', [DeviceAuthController::class, 'getSensorDataHistory']);
+    // Jangan lupa route sensor data juga diganti middlewarenya ke 'auth'
+    Route::get('/device/{device}/sensor-data/history', [SensorDataController::class, 'getSensorDataHistory']);
+    Route::get('/device/{device}/sensor-data/latest', [SensorDataController::class, 'getLatestSensorData']);
+});

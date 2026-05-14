@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Services\DeviceService;
+use App\Services\SensorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -15,11 +15,11 @@ class ProcessSensorData implements ShouldQueue
         public array $data
     ) {}
 
-    public function handle(DeviceService $deviceService): void
+    public function handle(SensorService $sensorService): void
     {
         Log::info('Queue: mulai proses sensor data', $this->data);
 
-        $sensorData = $deviceService->storeSensorData($this->data);
+        $sensorData = $sensorService->storeSensorData($this->data);
 
         Log::info('Queue: sensor data berhasil disimpan', [
             'id' => $sensorData->id,

@@ -2,48 +2,50 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Services\SensorService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSensorDataRequest;
-use App\Services\DeviceService;
+use App\Jobs\ProcessSensorData;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class SensorDataController extends Controller
 {
-    protected DeviceService $deviceService;
+    protected SensorService $sensorService;
 
-    public function __construct(DeviceService $deviceService)
+    public function __construct(SensorService $sensorService)
     {
-        $this->deviceService = $deviceService;
+        $this->sensorService = $sensorService;
     }
 
-    /**
-     * Store sensor data
-     * POST /api/sensor-data
-     */
-    public function store(StoreSensorDataRequest $request): JsonResponse
-    {
-        $data = $this->deviceService->storeSensorData($request->validated());
+    public function storeSensorData(
+        string $deviceId,
+        StoreSensorDataRequest $request
+    ): JsonResponse {
+        $data = $request->validated();
+        $data['device_id'] = $deviceId;
+
+        $start = microtime(true);
+
+        ProcessSensorData::dispatch($data);
+
+        $duration = round((microtime(true) - $start) * 1000, 2);
+
+        Log::info('API response time', [
+            'duration_ms' => $duration,
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Sensor data saved',
-            'data' => [
-                'id' => $data->id,
-                'device_id' => $data->device_id,
-                'created_at' => $data->created_at,
-            ]
-        ], 201);
+            'message' => 'Sensor data queued successfully',
+        ], 202);
     }
 
-    /**
-     * Get latest sensor data (with caching)
-     * GET /api/sensor-data/{device_id}/latest
-     */
-    public function latest(string $deviceId): JsonResponse
+    public function getLatestSensorData(string $deviceId): JsonResponse
     {
-        $data = $this->deviceService->getLatestSensorData($deviceId);
+        $sensorData = $this->sensorService->getLatestSensorData($deviceId);
 
-        if (!$data) {
+        if (!$sensorData) {
             return response()->json([
                 'success' => false,
                 'message' => 'No sensor data found',
@@ -52,7 +54,29 @@ class SensorDataController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $data
+            'data' => $sensorData,
+        ], 200);
+    }
+
+    public function getSensorDataHistory(string $deviceId): JsonResponse
+    {
+        $minutes = (int) request('minutes', 10);
+        $from = now()->subMinutes($minutes);
+
+        $data = \App\Models\SensorData::where('device_id', $deviceId)
+            ->where('created_at', '>=', $from)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'labels' => $data->map(fn($d) => $d->created_at->format('H:i')),
+                'heart_rate' => $data->pluck('heart_rate'),
+                'spo2' => $data->pluck('spo2'),
+                'temperature' => $data->pluck('temperature'),
+                'status' => $data->pluck('status'),
+            ],
         ], 200);
     }
 }

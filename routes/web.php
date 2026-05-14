@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\InstructionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\ManajemenAlatController;
+use App\Http\Controllers\SuperadminLaporanController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -30,6 +35,9 @@ Route::middleware(['auth'])->group(function () {
         // Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
         Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
         Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('laporan.pdf');
+        Route::get('/instruksi', function () {
+            return view('pages.nakes.instruksi');
+        })->name('nakes.instruksi');
     });
 
     // Dokter Routes
@@ -38,6 +46,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('dokter.input-data-pasien');
         Route::get('/laporan', [LaporanController::class, 'index'])->name('dokter.laporan');
         Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('dokter.laporan.pdf');
+
+        Route::get('/instruksi', function () {
+            return view('pages.dokter.instruksi');
+        })->name('dokter.instruksi');
     });
 
     // Superadmin Routes
@@ -52,11 +64,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/laporan', [SuperadminLaporanController::class, 'index'])->name('superadmin.laporan');
         Route::get('/laporan/pdf', [SuperadminLaporanController::class, 'pdf'])->name('superadmin.laporan.pdf');
     });
-
-    // Comment endpoints (accessible by dokter & nakes)
-    Route::get('/api/comments', [CommentController::class, 'index']);
-    Route::post('/api/comments', [CommentController::class, 'store']);
-    Route::patch('/api/comments/{comment}/respond', [CommentController::class, 'respond']);
 
     // Device list endpoint (for dashboard polling)
     Route::get('/api/devices', [DashboardController::class, 'getDevicesApi']);
