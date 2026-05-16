@@ -154,10 +154,26 @@
                 },
 
                 async init() {
+                    // Ambil device pertama dari API
+                    await this.fetchDeviceId();
                     await this.getHistory();
                     this.setupReverb();
+                    // Polling setiap 5 detik (fallback jika Reverb tidak jalan)
+                    setInterval(() => this.getHistory(), 5000);
                     // Scroll ke bawah setelah data awal dimuat
                     setTimeout(() => this.scrollToBottom(), 500);
+                },
+
+                async fetchDeviceId() {
+                    try {
+                        const res = await fetch('/api/devices');
+                        const json = await res.json();
+                        if (json.success && json.data.length > 0) {
+                            this.deviceId = json.data[0].device_id;
+                        }
+                    } catch (e) {
+                        console.error('Fetch device error:', e);
+                    }
                 },
 
                 setupReverb() {
@@ -190,7 +206,12 @@
                         const res = await fetch(`/api/instruction?device_id=${this.deviceId}`);
                         const json = await res.json();
                         if (json.success) {
+                            const prevCount = this.instruksi.length;
                             this.instruksi = json.data;
+                            // Scroll ke bawah hanya jika ada data baru
+                            if (json.data.length > prevCount) {
+                                this.scrollToBottom();
+                            }
                         }
                     } catch (e) {
                         console.error('History Error:', e);

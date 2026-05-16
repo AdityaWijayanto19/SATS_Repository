@@ -306,32 +306,157 @@ curl -X GET http://localhost:8000/api/device/DEVICE_01/config \
 
 ---
 
-## 7. Get Latest Sensor Data (Legacy)
+## 7. Get Sensor Data History
 
-Endpoint lama untuk backward compatibility.
+Endpoint untuk **mengambil riwayat data sensor** dalam rentang waktu tertentu.
 
 ```
-GET /sensor-data/{device_id}/latest
+GET /device/{device_id}/sensor-data/history
 ```
 
 **Full URL:**
 ```
-GET http://localhost:8000/api/sensor-data/DEVICE_01/latest
+GET http://localhost:8000/api/device/DEVICE_01/sensor-data/history?minutes=10
+```
+
+**Required Headers:**
+```
+X-API-Key: test_key_device_01
+```
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `minutes` | integer | 10 | Rentang waktu dalam menit |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "device_id": "DEVICE_01",
+      "heart_rate": 85,
+      "spo2": 98,
+      "temperature": 36.5,
+      "status": "normal",
+      "created_at": "2026-05-14T12:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 8. Instruction Endpoints (Session Auth)
+
+Endpoint untuk **sistem instruksi dokter-nakes**. Menggunakan session auth (web middleware).
+
+### Get Instructions
+
+```
+GET /api/instruction?device_id=DEVICE_01
 ```
 
 **Response (200 OK):**
 ```json
 {
   "success": true,
-  "data": {
-    "id": 1,
-    "device_id": "DEVICE_01",
-    "heart_rate": 85,
-    "spo2": 98,
-    "temperature": 36.5,
-    "status": "normal",
-    "created_at": "2026-05-04T12:00:00Z"
-  }
+  "data": [
+    {
+      "id": 1,
+      "instruksi_dokter": "Berikan oksigen 2L/menit",
+      "is_completed": false,
+      "user_name": "Dr. Andi",
+      "nakes_name": "Suster Rina",
+      "waktu": "14:30",
+      "completed_at": null,
+      "respon_nakes": null,
+      "laporan_nakes": null
+    }
+  ]
+}
+```
+
+### Store Instruction (Dokter)
+
+```
+POST /api/instruction
+```
+
+**Request Body:**
+```json
+{
+  "device_id": "DEVICE_01",
+  "instruksi_dokter": "Berikan oksigen 2L/menit"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "data": { "id": 1, "instruksi_dokter": "Berikan oksigen 2L/menit", "..." : "..." },
+  "message": "Instruksi berhasil dibuat"
+}
+```
+
+### Store Report (Nakes)
+
+```
+POST /api/instruction/report
+```
+
+**Request Body:**
+```json
+{
+  "device_id": "DEVICE_01",
+  "laporan_nakes": "Pasien mengalami sesak napas ringan"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "data": { "id": 2, "laporan_nakes": "Pasien mengalami sesak napas ringan", "..." : "..." },
+  "message": "Laporan berhasil disubmit"
+}
+```
+
+### Update Instruction (Dokter)
+
+```
+PATCH /api/instruction/{id}
+```
+
+**Request Body:**
+```json
+{
+  "instruksi_dokter": "Update: Berikan oksigen 3L/menit"
+}
+```
+
+### Complete Instruction (Nakes)
+
+```
+PATCH /api/instruction/{id}/complete
+```
+
+**Request Body:**
+```json
+{
+  "respon_nakes": "Sudah dilakukan"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": { "id": 1, "is_completed": true, "respon_nakes": "Sudah dilakukan", "..." : "..." },
+  "message": "Instruksi berhasil diselesaikan"
 }
 ```
 
@@ -426,4 +551,4 @@ GET http://localhost:8000/api/sensor-data/DEVICE_01/latest
 
 ---
 
-Last Updated: 2026-05-04
+Last Updated: 2026-05-14

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('nakes_id')->nullable()->constrained('users')->onDelete('set null');
 
             // Instruction content & response
-            $table->text('instruksi_dokter');
+            $table->text('instruksi_dokter')->nullable();
             $table->text('respon_nakes')->nullable();
             $table->text('laporan_nakes')->nullable();
 

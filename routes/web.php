@@ -9,7 +9,7 @@ use App\Http\Controllers\ManajemenAlatController;
 use App\Http\Controllers\SuperadminLaporanController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('pages.landing');
 });
 
 Route::get('/login', [AuthController::class, 'viewLoginPage'])->name('login');

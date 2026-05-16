@@ -160,9 +160,25 @@
                 },
 
                 async init() {
+                    // Ambil device pertama dari API
+                    await this.fetchDeviceId();
                     await this.getHistory();
                     this.setupReverb();
+                    // Polling setiap 5 detik (fallback jika Reverb tidak jalan)
+                    setInterval(() => this.getHistory(), 5000);
                     setTimeout(() => this.scrollToBottom(), 500);
+                },
+
+                async fetchDeviceId() {
+                    try {
+                        const res = await fetch('/api/devices');
+                        const json = await res.json();
+                        if (json.success && json.data.length > 0) {
+                            this.deviceId = json.data[0].device_id;
+                        }
+                    } catch (e) {
+                        console.error('Fetch device error:', e);
+                    }
                 },
 
                 setupReverb() {
@@ -187,10 +203,19 @@
                         const res = await fetch(`/api/instruction?device_id=${this.deviceId}`);
                         const json = await res.json();
                         if (json.success) {
-                            this.instruksi = json.data.map(item => ({
-                                ...item,
-                                selectedRespon: ''
-                            }));
+                            const prevCount = this.instruksi.length;
+                            // Preserve selectedRespon state saat polling
+                            this.instruksi = json.data.map(item => {
+                                const existing = this.instruksi.find(i => i.id === item.id);
+                                return {
+                                    ...item,
+                                    selectedRespon: existing ? existing.selectedRespon : ''
+                                };
+                            });
+                            // Scroll ke bawah hanya jika ada data baru
+                            if (json.data.length > prevCount) {
+                                this.scrollToBottom();
+                            }
                         }
                     } catch (e) {
                         console.error('History Error:', e);

@@ -41,19 +41,15 @@ system_statuses (health device)
 ├── device_id (primary key)
 ├── monitoring_status (active/inactive)
 ├── battery_level (0-100%)
-├── signal_strength (0-100%)
+├── signal_strength (dBm)
 └── updated_at
 
 api_keys (authentikasi device)
 ├── id (primary key)
 ├── device_id (foreign key → devices)
-├── key_hash (hashed API key untuk security)
+├── key (hashed API key untuk security)
 ├── name (friendly name)
 ├── is_active (aktif/inactive)
-├── rate_limit_per_minute (default 60)
-├── last_used (timestamp terakhir pakai)
-├── last_used_ip (IP device terakhir)
-├── expires_at (auto-expire)
 └── created_at, updated_at
 ```
 
@@ -131,11 +127,9 @@ $status->isSignalWeak(); // Check signal < 30%
 // Contoh create:
 ApiKey::create([
     'device_id' => 'DEVICE_01',
-    'key_hash' => Hash::make('plainkey_abc123'),
+    'key' => Hash::make('plainkey_abc123'),
     'name' => 'Device SATS #1',
     'is_active' => true,
-    'rate_limit_per_minute' => 60,
-    'expires_at' => now()->addYear(), // Auto-expire 1 tahun
 ]);
 
 // Contoh verify:
@@ -223,8 +217,8 @@ X-API-Key: {api_key}
 
 ### **4. Controllers** (`app/Http/Controllers/Api/`)
 
-#### **DeviceAuthController.php**
-**Handle semua device communication requests**
+#### **DeviceDataController.php**
+**Handle device communication requests (auth, system status, config)**
 
 **Methods:**
 
@@ -516,10 +510,8 @@ system_statuses:
   - Primary key: device_id (one-to-one)
 
 api_keys:
-  - Unique on (key_hash)              ← untuk quick lookup
+  - Unique on (key)                   ← untuk quick lookup
   - Index on (device_id)              ← untuk find keys per device
-  - Index on (is_active)              ← untuk query active keys
-  - Index on (last_used)              ← untuk find dormant keys
 ```
 
 **Query Patterns:**
@@ -548,29 +540,9 @@ Devices::with(['sensorData', 'systemStatus'])
   $table->string('key');
 
 ✅ BENAR: Hash key dengan bcrypt
-  $table->string('key_hash');
-  $key_hash = Hash::make($plainKey);
-  Hash::check($plainKey, $key_hash);
-```
-
-**Auto-Expiration:**
-```php
-// Key bisa auto-expire
-'expires_at' => now()->addYear(),
-
-// Validation saat authenticate
-if ($key->expires_at && $key->expires_at->isPast()) {
-    return null; // Invalid, expired
-}
-```
-
-**Rate Limiting:**
-```php
-// Track rate limit per device
-'rate_limit_per_minute' => 60
-
-// Device bisa kirim max 60 request/menit
-// Jika > 60, return 429 Too Many Requests
+  $table->string('key');
+  $key = Hash::make($plainKey);
+  Hash::check($plainKey, $key);
 ```
 
 ### **4. Response Time**
@@ -770,8 +742,8 @@ app/
 │
 ├── Http/
 │   ├── Controllers/Api/
-│   │   ├── DeviceAuthController.php   ← Device endpoints (6 methods)
-│   │   └── SensorDataController.php   ← Legacy endpoints
+│   │   ├── DeviceDataController.php   ← Device endpoints (auth, status, config)
+│   │   └── SensorDataController.php   ← Sensor data endpoints (store, latest, history)
 │   │
 │   ├── Requests/
 │   │   ├── StoreSensorDataRequest.php      ← Validation sensor data

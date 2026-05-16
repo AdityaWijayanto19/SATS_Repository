@@ -42,7 +42,11 @@ class InstructionService
         ]);
 
         $formatted = $this->formatSingleInstruction($instruction);
-        broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+        try {
+            broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast InstructionSent failed: ' . $e->getMessage());
+        }
 
         return $formatted;
     }
@@ -63,7 +67,11 @@ class InstructionService
         ]);
 
         // Broadcast ke dokter bahwa tugas sudah selesai
-        broadcast(new InstructionStatusUpdated($instruction->load('nakes:id,name')))->toOthers();
+        try {
+            broadcast(new InstructionStatusUpdated($instruction->load('nakes:id,name')))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast InstructionStatusUpdated failed: ' . $e->getMessage());
+        }
 
         return $instruction;
     }
@@ -77,7 +85,11 @@ class InstructionService
         ]);
 
         // Broadcast ke nakes bahwa ada instruksi baru
-        broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+        try {
+            broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast InstructionSent failed: ' . $e->getMessage());
+        }
 
         return $instruction;
     }
@@ -94,7 +106,11 @@ class InstructionService
 
         // Broadcast ke dokter bahwa ada laporan baru
         $formatted = $this->formatSingleInstruction($instruction);
-        broadcast(new InstructionReportSubmitted($instruction->load('nakes:id,name')))->toOthers();
+        try {
+            broadcast(new InstructionReportSubmitted($instruction->load('nakes:id,name')))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast InstructionReportSubmitted failed: ' . $e->getMessage());
+        }
 
         return $formatted;
     }
