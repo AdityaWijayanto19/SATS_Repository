@@ -37,7 +37,7 @@
 | **WebSocket** | Laravel Reverb v1.0 (broadcasting)             |
 | **Queue**     | Redis (predis/predis v3.4) + Database driver   |
 | **IoT**       | Arduino IDE (kode terpisah, belum ada di repo)  |
-| **ML**        | Belum diimplementasikan (rencana di akhir)      |
+| **ML**        | Hugging Face Spaces (Gradio async 2-step API)   |
 
 ---
 
@@ -76,6 +76,7 @@
 - Dropdown perangkat (polling `/api/devices` setiap 10 detik, auto-update tanpa refresh)
 - 4 kartu statistik: Heart Rate, SpO2, Suhu, Kondisi Pasien
 - Banner prediksi ML (dari database, fallback "Data prediksi belum tersedia")
+- Probability card: Membaik/Stabil/Memburuk % dengan progress bar
 - 3 grafik real-time Chart.js (polling setiap 5 detik, skip update jika data sama)
 - **Terhubung ke API real (sensor-data/latest, sensor-data/history, instruction)**
 
@@ -178,7 +179,6 @@
 - Laporan dari database (masih dummy data)
 - Device config dari database (masih hardcoded)
 - Activity log controller
-- Integrasi ML
 
 ### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
 
@@ -196,13 +196,30 @@ Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware.
   - `GET /api/device/{device_id}/sensor-data/history?minutes=10`
   - `GET /api/device/{device_id}/system-status`
 
-### 13. Machine Learning [BELUM ADA]
+### 13. Machine Learning [SELESAI]
 
-Direncanakan ditambahkan di akhir project. Fitur:
-- Prediksi: "Pasien akan memburuk X% dalam Y menit ke depan"
-- Klasifikasi: Normal / Warning / Critical
-- Endpoint: `GET /api/device/{device_id}/prediction`
-- Response: `{ risk_level, risk_percent, timeframe_minutes, message }`
+Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-step API).
+
+**Alur:**
+1. Setiap 5 data sensor baru, `SensorService` trigger `PatientMonitoringService`
+2. Kirim 15 angka (5 menit × 3 vital signs: HR, Temp, SpO2) ke API eksternal
+3. Hasil disimpan di tabel `devices`: `ml_prediction`, `ml_condition`, `ml_risk_level`, `ml_probabilities`, `ml_predicted_at`
+4. Broadcast ulang ke dashboard via WebSocket setelah prediksi selesai
+
+**Output ML:**
+- Prediksi teks: "Pasien akan MEMBURUK (63%) dalam 5 menit ke depan"
+- Kondisi: `NORMAL` / `WARNING` / `CRITICAL`
+- Risk Level: `Low Risk` / `Medium Risk` / `High Risk`
+- Probabilitas: Membaik (%) / Stabil (%) / Memburuk (%)
+
+**Frontend:**
+- Banner prediksi ML di dashboard nakes & dokter
+- Probability card (3 kolom: Membaik, Stabil, Memburuk % dengan progress bar)
+- Data di-update real-time via WebSocket
+
+**API:** `GET /api/device/{device_id}/prediction`
+**Service:** `PatientMonitoringService.php` (Hugging Face Spaces)
+**Docs:** [API_INTEGRATION.md](API_INTEGRATION.md)
 
 ---
 
@@ -234,11 +251,12 @@ Direncanakan ditambahkan di akhir project. Fitur:
 - [ ] Stress testing API endpoint
 - [ ] Validasi data sensor (toleransi outlier)
 
-### Prioritas 5 — Machine Learning
-- [ ] Training model prediksi kondisi pasien
-- [ ] Integrasi model ke pipeline data
-- [ ] Endpoint prediksi
-- [ ] Tampilkan prediksi di dashboard dan laporan
+### Prioritas 5 — Machine Learning [SELESAI]
+- [x] Training model prediksi kondisi pasien (Hugging Face Spaces)
+- [x] Integrasi model ke pipeline data (PatientMonitoringService + SensorService)
+- [x] Endpoint prediksi (`GET /api/device/{id}/prediction`)
+- [x] Tampilkan prediksi di dashboard (banner + probability card)
+- [x] Probabilitas Membaik/Stabil/Memburuk di dashboard nakes & dokter
 
 ---
 
@@ -421,7 +439,7 @@ Data yang di-seed:
 
 #### 7. Jalankan Development Server
 
-Buka **2 terminal** secara bersamaan:
+Buka **4 terminal** secara bersamaan:
 
 **Terminal 1 — Vite (Tailwind CSS & hot reload):**
 ```bash
@@ -431,6 +449,16 @@ npm run dev
 **Terminal 2 — Laravel server:**
 ```bash
 php artisan serve
+```
+
+**Terminal 3 — Queue worker (proses sensor data + ML prediction):**
+```bash
+php artisan queue:work
+```
+
+**Terminal 4 — Reverb WebSocket server (real-time updates):**
+```bash
+php artisan reverb:start
 ```
 
 > Atau jika menggunakan Laragon, akses langsung: `http://sats-repository.test`
@@ -495,7 +523,9 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 | Simulator `ModuleNotFoundError` | Jalankan `pip install -r requirements.txt` di folder `simulasi_py/` |
 | Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
 | Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed di database |
-| Dashboard tidak update | Pastikan simulator berjalan, cek polling interval (5 detik) |
+| Dashboard tidak update | Pastikan simulator berjalan + Reverb & queue worker running |
+| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terpisah |
+| ML prediction tidak muncul | Pastikan `php artisan queue:work` berjalan, cek log untuk "ML trigger" |
 
 ---
 
@@ -555,4 +585,4 @@ Rekam medis ter-generate otomatis
 
 ---
 
-*Last updated: 14 Mei 2026*
+*Last updated: 18 Mei 2026*

@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Dashboard')
 
 @section('content')
     <main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]" x-data="dashboard()" x-init="init()">
@@ -126,6 +127,45 @@
                     'bg-red-100 text-red-700': latest?.ml_condition === 'CRITICAL'
                 }"
                 x-text="latest?.ml_risk_level ?? latest?.ml_condition"></span>
+        </div>
+
+        {{-- Probabilitas Kondisi Pasien --}}
+        <div x-show="latest?.ml_probabilities" x-transition
+            class="grid grid-cols-3 gap-3 mb-4">
+
+            {{-- Membaik --}}
+            <div class="bg-green-50 rounded-xl p-4 border border-green-200 text-center">
+                <p class="text-xs font-medium text-green-500 mb-1">Membaik</p>
+                <p class="text-3xl font-bold text-green-600"
+                    x-text="(latest?.ml_probabilities?.membaik ?? '—') + (latest?.ml_probabilities?.membaik != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-green-100 rounded-full h-1.5">
+                    <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.membaik ?? 0) + '%'"></div>
+                </div>
+            </div>
+
+            {{-- Stabil --}}
+            <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-center">
+                <p class="text-xs font-medium text-yellow-500 mb-1">Stabil</p>
+                <p class="text-3xl font-bold text-yellow-600"
+                    x-text="(latest?.ml_probabilities?.stabil ?? '—') + (latest?.ml_probabilities?.stabil != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-yellow-100 rounded-full h-1.5">
+                    <div class="bg-yellow-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.stabil ?? 0) + '%'"></div>
+                </div>
+            </div>
+
+            {{-- Memburuk --}}
+            <div class="bg-red-50 rounded-xl p-4 border border-red-200 text-center">
+                <p class="text-xs font-medium text-red-400 mb-1">Memburuk</p>
+                <p class="text-3xl font-bold text-red-500"
+                    x-text="(latest?.ml_probabilities?.memburuk ?? '—') + (latest?.ml_probabilities?.memburuk != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-red-100 rounded-full h-1.5">
+                    <div class="bg-red-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.memburuk ?? 0) + '%'"></div>
+                </div>
+            </div>
+
         </div>
 
         {{-- Grafik Sensor --}}

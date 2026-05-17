@@ -68,17 +68,22 @@ GET /gradio_api/call/predict/{event_id}
 
 ```
 event: complete
-data: ["Pasien akan MEMBURUK (63%) dalam 5 menit ke depan", "Membaik   :  11% ##\nStabil    :  26% #####\nMemburuk  :  63% #############", "WARNING", "High Risk"]
+data: ["Pasien akan MEMBURUK (63%) dalam 5 menit ke depan", "Membaik   :  11% ##\nStabil    :  26% #####\nMemburuk  :  63% #############", "WARNING", "High Risk", 11, 26, 63]
 ```
 
 **Parse `data` array:**
 
-| Index | Isi | Contoh |
-|-------|-----|--------|
-| `[0]` | Prediksi | `"Pasien akan MEMBURUK (63%) dalam 5 menit ke depan"` |
-| `[1]` | Probabilitas detail | `"Membaik: 11% ..."` |
-| `[2]` | Kondisi | `"NORMAL"` / `"WARNING"` / `"CRITICAL"` |
-| `[3]` | Risk Level | `"Low Risk"` / `"Medium Risk"` / `"High Risk"` |
+| Index | Isi | Tipe | Contoh |
+|-------|-----|------|--------|
+| `[0]` | Prediksi | string | `"Pasien akan MEMBURUK (63%) dalam 5 menit ke depan"` |
+| `[1]` | Probabilitas detail (bar chart) | string | `"Membaik: 11% ..."` |
+| `[2]` | Kondisi | string | `"NORMAL"` / `"WARNING"` / `"CRITICAL"` |
+| `[3]` | Risk Level | string | `"Low Risk"` / `"Medium Risk"` / `"High Risk"` |
+| `[4]` | Membaik (%) | number | `11` |
+| `[5]` | Stabil (%) | number | `26` |
+| `[6]` | Memburuk (%) | number | `63` |
+
+> **Tip:** Gunakan index `[4]`, `[5]`, `[6]` untuk menampilkan probabilitas di frontend. Nilainya sudah berupa angka bulat (0-100), langsung bisa dipakai.
 
 ---
 
@@ -132,9 +137,9 @@ async function predictPatient(vitalSigns) {
 
     // Parse SSE response
     const match = text.match(/data: (.+)/);
-    const [prediction, probabilities, condition, riskLevel] = JSON.parse(match[1]);
+    const [prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk] = JSON.parse(match[1]);
 
-    return { prediction, probabilities, condition, riskLevel };
+    return { prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk };
 }
 
 // Cara pakai:
@@ -154,6 +159,9 @@ console.log(result.condition);
 
 console.log(result.riskLevel);
 // "High Risk"
+
+console.log(`Membaik: ${result.membaik}%, Stabil: ${result.stabil}%, Memburuk: ${result.memburuk}%`);
+// "Membaik: 11%, Stabil: 26%, Memburuk: 63%"
 ```
 
 ---
@@ -184,10 +192,10 @@ export default function PatientMonitor() {
             );
             const text = await res2.text();
             const match = text.match(/data: (.+)/);
-            const [prediction, probabilities, condition, riskLevel] =
+            const [prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk] =
                 JSON.parse(match[1]);
 
-            setResult({ prediction, probabilities, condition, riskLevel });
+            setResult({ prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk });
         } catch (err) {
             console.error("Prediction failed:", err);
         }
@@ -211,6 +219,7 @@ export default function PatientMonitor() {
                     <h3>{result.prediction}</h3>
                     <p>Kondisi: {result.condition}</p>
                     <p>Risk: {result.riskLevel}</p>
+                    <p>Membaik: {result.membaik}% | Stabil: {result.stabil}% | Memburuk: {result.memburuk}%</p>
                 </div>
             )}
         </div>
@@ -233,6 +242,7 @@ export default function PatientMonitor() {
       <h3>{{ result.prediction }}</h3>
       <p>Kondisi: {{ result.condition }}</p>
       <p>Risk: {{ result.riskLevel }}</p>
+      <p>Membaik: {{ result.membaik }}% | Stabil: {{ result.stabil }}% | Memburuk: {{ result.memburuk }}%</p>
     </div>
   </div>
 </template>
@@ -265,9 +275,9 @@ async function handlePredict() {
     const res2 = await fetch(`${API_URL}/gradio_api/call/predict/${event_id}`)
     const text = await res2.text()
     const match = text.match(/data: (.+)/)
-    const [prediction, probabilities, condition, riskLevel] = JSON.parse(match[1])
+    const [prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk] = JSON.parse(match[1])
 
-    result.value = { prediction, probabilities, condition, riskLevel }
+    result.value = { prediction, probabilities, condition, riskLevel, membaik, stabil, memburuk }
   } catch (err) {
     console.error('Prediction failed:', err)
   }
@@ -317,6 +327,9 @@ class PatientMonitoringService
             'probabilities' => $data[1],
             'condition'     => $data[2],
             'risk_level'    => $data[3],
+            'membaik'       => $data[4],
+            'stabil'        => $data[5],
+            'memburuk'      => $data[6],
         ];
     }
 
@@ -408,6 +421,7 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
         <h3>${data.prediction}</h3>
         <p>Kondisi: ${data.condition}</p>
         <p>Risk: ${data.risk_level}</p>
+        <p>Membaik: ${data.membaik}% | Stabil: ${data.stabil}% | Memburuk: ${data.memburuk}%</p>
     `;
 });
 </script>
@@ -462,6 +476,9 @@ function predictPatient($vitalSigns) {
         "probabilities" => $data[1],
         "condition" => $data[2],
         "risk_level" => $data[3],
+        "membaik" => $data[4],
+        "stabil" => $data[5],
+        "memburuk" => $data[6],
     ];
 }
 ?>

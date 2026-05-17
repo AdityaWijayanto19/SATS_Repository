@@ -53,6 +53,8 @@ class SensorDataReceived implements ShouldBroadcastNow
                 'ml_prediction' => $device?->ml_prediction,
                 'ml_condition' => $device?->ml_condition,
                 'ml_risk_level' => $device?->ml_risk_level,
+                'ml_probabilities' => json_decode($device?->ml_probabilities, true),
+                'ml_predicted_at' => $device?->ml_predicted_at?->format('H:i'),
             ],
             'history' => [
                 'labels' => $history->map(fn($d) => $d->created_at->format('H:i')),

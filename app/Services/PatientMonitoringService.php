@@ -80,14 +80,17 @@ class PatientMonitoringService
                 'decoded_keys' => is_array($data) ? array_keys($data) : null,
             ]);
 
-            // Response bisa indexed array [pred, prob, cond, risk] atau object
+            // Response bisa indexed array [pred, prob, cond, risk, membaik, stabil, memburuk] atau object
             if (is_array($data) && isset($data[0])) {
-                // Indexed array format
+                // Indexed array format — 7 elemen sesuai API_INTEGRATION.md
                 return [
                     'prediction'    => $data[0],
                     'probabilities' => $data[1] ?? '',
                     'condition'     => $data[2] ?? 'NORMAL',
                     'risk_level'    => $data[3] ?? 'Low Risk',
+                    'membaik'       => is_numeric($data[4] ?? null) ? (int) $data[4] : null,
+                    'stabil'        => is_numeric($data[5] ?? null) ? (int) $data[5] : null,
+                    'memburuk'      => is_numeric($data[6] ?? null) ? (int) $data[6] : null,
                 ];
             } elseif (is_array($data) && (isset($data['prediction']) || isset($data['data']))) {
                 // Object format — mungkin ada key 'data' yang berisi array
@@ -98,6 +101,9 @@ class PatientMonitoringService
                         'probabilities' => $inner[1] ?? '',
                         'condition'     => $inner[2] ?? 'NORMAL',
                         'risk_level'    => $inner[3] ?? 'Low Risk',
+                        'membaik'       => is_numeric($inner[4] ?? null) ? (int) $inner[4] : null,
+                        'stabil'        => is_numeric($inner[5] ?? null) ? (int) $inner[5] : null,
+                        'memburuk'      => is_numeric($inner[6] ?? null) ? (int) $inner[6] : null,
                     ];
                 }
                 return [
@@ -105,6 +111,9 @@ class PatientMonitoringService
                     'probabilities' => $inner['probabilities'] ?? '',
                     'condition'     => $inner['condition'] ?? 'NORMAL',
                     'risk_level'    => $inner['risk_level'] ?? 'Low Risk',
+                    'membaik'       => is_numeric($inner['membaik'] ?? null) ? (int) $inner['membaik'] : null,
+                    'stabil'        => is_numeric($inner['stabil'] ?? null) ? (int) $inner['stabil'] : null,
+                    'memburuk'      => is_numeric($inner['memburuk'] ?? null) ? (int) $inner['memburuk'] : null,
                 ];
             }
 

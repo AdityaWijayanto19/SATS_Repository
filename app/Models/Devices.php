@@ -18,6 +18,12 @@ class Devices extends Model
         'ml_prediction',
         'ml_condition',
         'ml_risk_level',
+        'ml_probabilities',
+        'ml_predicted_at',
+    ];
+
+    protected $casts = [
+        'ml_predicted_at' => 'datetime',
     ];
 
     public function sensorData()

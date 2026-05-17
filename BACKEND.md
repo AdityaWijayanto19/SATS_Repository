@@ -44,7 +44,7 @@ app/
       CompleteInstructionRequest.php
   Models/
     User.php                            # users
-    Devices.php                         # devices (PK: device_id string)
+    Devices.php                         # devices (PK: device_id string, ML fields)
     SensorData.php                      # sensor_datas
     SystemStatus.php                    # system_statuses
     ApiKey.php                          # api_keys
@@ -52,6 +52,7 @@ app/
     MedicalRecord.php                   # medical_records
     ActivityLog.php                     # activity_log
     Instruction.php                     # instructions
+    NakesDeviceConfig.php               # nakes_device_configs
   Services/
     AuthService.php                     # Login, logout, reset password
     DeviceService.php                   # Sensor data CRUD + caching
@@ -188,8 +189,10 @@ simulasi_py/
 - `storeReport(array)` — Submit laporan nakes, broadcast `InstructionReportSubmitted`
 
 ### SensorService
-- `storeSensorData(array)` — Simpan data sensor + update device status
+- `storeSensorData(array)` — Simpan data sensor + update device status + broadcast + trigger ML
 - `getLatestSensorData(string)` — Ambil data terakhir (cache 5 menit)
+- `triggerPredictionIfNeeded(string)` — Trigger prediksi ML setiap 5 data baru (patokan: `ml_predicted_at`)
+- `runPrediction(string)` — Jalankan ML prediction, simpan hasil + probabilities, broadcast ulang
 
 ---
 
@@ -317,8 +320,11 @@ python simulator.py
 - [x] **Machine Learning Integration**
   - Prediksi dari 3 vital sign: HR, SpO2, Temperature
   - API Hugging Face Spaces (Gradio async 2-step)
-  - Hasil disimpan di tabel `devices` (persisten)
-  - Trigger setiap 5 data baru
+  - Hasil disimpan di tabel `devices` (persisten): `ml_prediction`, `ml_condition`, `ml_risk_level`, `ml_probabilities`, `ml_predicted_at`
+  - Trigger setiap 5 data baru (patokan: `ml_predicted_at`, bukan `updated_at`)
+  - Probabilitas (Membaik/Stabil/Memburuk %) disimpan sebagai JSON di `ml_probabilities`
+  - Broadcast ulang ke dashboard setelah prediksi selesai
+  - Broadcast failure tidak mematikan queue job (try-catch)
 
 - [x] **Endpoint `/api/devices` Gabungan**
   - Return data card (latest) + data grafik (history 10 menit) dalam satu response
@@ -398,4 +404,4 @@ python simulator.py
 
 ---
 
-*Last updated: 17 Mei 2026*
+*Last updated: 18 Mei 2026*

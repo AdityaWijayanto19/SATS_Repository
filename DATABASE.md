@@ -14,12 +14,13 @@ Database `sats_db` digunakan oleh sistem SATS (Smart Ambulance Telemedicine Syst
 |-------------|       |----------------|       |------------------|
 | id (PK)     |<------+ nakes (FK)     |       | device_id (PK)   |
 | name        |       | id (PK)        |       | status           |
-| email       |       | device_id (FK) +------>| last_seen        |
-| password    |       | nama           |       +------------------+
-| role        |       | jenis_kelamin  |               |
-+-------------+       | umur           |               |
-                      | catatan_tambahan|               |
-                      +----------------+               |
+| email       |       | device_id (FK) +------>| ml_prediction    |
+| password    |       | nama           |       | ml_condition     |
+| role        |       | jenis_kelamin  |       | ml_risk_level    |
++-------------+       | umur           |       | ml_probabilities |
+                      | catatan_tambahan|       | ml_predicted_at  |
+                      +----------------+       | last_seen        |
+                                               +------------------+
                               |                        |
                               v                        v
                       +------------------+    +-------------------+
@@ -90,6 +91,11 @@ Menyimpan data perangkat SATS Wearable yang terdaftar.
 |-----------|---------|------------------|--------------------------------|
 | device_id | varchar | PK               | ID unik perangkat (e.g. DEV-001) |
 | status    | enum    | NOT NULL         | `online`, `offline`            |
+| ml_prediction | text | NULL            | Teks prediksi dari ML (e.g. "Pasien akan MEMBURUK...") |
+| ml_condition | varchar | NULL          | Kondisi dari ML: `NORMAL`, `WARNING`, `CRITICAL` |
+| ml_risk_level | varchar | NULL         | Risk level: `Low Risk`, `Medium Risk`, `High Risk` |
+| ml_probabilities | text | NULL         | JSON probabilitas: `{"membaik":11,"stabil":26,"memburuk":63}` |
+| ml_predicted_at | timestamp | NULL      | Waktu prediksi ML terakhir dijalankan |
 | last_seen | timestamp | NULL           | Terakhir perangkat mengirim data |
 
 ---
@@ -295,4 +301,4 @@ Tabel berikut sudah ada dari migration default Laravel:
 
 ---
 
-*Last updated: 14 Mei 2026*
+*Last updated: 18 Mei 2026*

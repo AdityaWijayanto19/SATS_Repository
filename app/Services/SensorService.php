@@ -39,7 +39,14 @@ class SensorService
         $this->clearLatestDataCache($data['device_id']);
 
         // Broadcast data baru ke semua dashboard yang terhubung
-        broadcast(new SensorDataReceived($data['device_id'], $sensorData));
+        try {
+            broadcast(new SensorDataReceived($data['device_id'], $sensorData));
+        } catch (\Exception $e) {
+            Log::warning('Broadcast sensor data gagal (Reverb mungkin tidak running)', [
+                'device_id' => $data['device_id'],
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         // Trigger prediksi ML di background (tidak blocking response)
         // Hanya di-trigger setiap 5 data baru untuk menghindari API rate limit
@@ -59,8 +66,10 @@ class SensorService
 
             // Sudah ada prediksi → cek apakah ada 5 data baru sejak prediksi terakhir
             if ($device && $device->ml_prediction) {
+                // Gunakan ml_predicted_at (bukan updated_at yang berubah setiap last_seen update)
+                $since = $device->ml_predicted_at ?? $device->updated_at;
                 $newDataCount = SensorData::where('device_id', $deviceId)
-                    ->where('created_at', '>', $device->updated_at)
+                    ->where('created_at', '>', $since)
                     ->count();
 
                 Log::info('ML trigger check', [
@@ -112,14 +121,36 @@ class SensorService
 
         // Simpan prediksi di tabel devices (selalu tersedia, tidak hilang saat data baru masuk)
         Devices::where('device_id', $deviceId)->update([
-            'ml_prediction' => $prediction['prediction'],
-            'ml_condition'  => $prediction['condition'],
-            'ml_risk_level' => $prediction['risk_level'],
+            'ml_prediction'     => $prediction['prediction'],
+            'ml_condition'      => $prediction['condition'],
+            'ml_risk_level'     => $prediction['risk_level'],
+            'ml_probabilities'  => json_encode([
+                'membaik'  => $prediction['membaik'] ?? null,
+                'stabil'   => $prediction['stabil'] ?? null,
+                'memburuk' => $prediction['memburuk'] ?? null,
+            ]),
+            'ml_predicted_at'   => Carbon::now(),
         ]);
 
         // Clear cache supaya dashboard dapat data terbaru
         $this->clearLatestDataCache($deviceId);
         Cache::forget("ml_prediction_{$deviceId}");
+
+        // Broadcast ulang agar dashboard mendapat data ML terbaru
+        $latestSensor = SensorData::where('device_id', $deviceId)
+            ->latest('created_at')
+            ->first();
+
+        if ($latestSensor) {
+            try {
+                broadcast(new SensorDataReceived($deviceId, $latestSensor));
+            } catch (\Exception $e) {
+                Log::warning('Broadcast ML prediction gagal (Reverb mungkin tidak running)', [
+                    'device_id' => $deviceId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         Log::info('ML prediction stored', [
             'device_id' => $deviceId,

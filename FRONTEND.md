@@ -138,6 +138,7 @@ resources/views/
 - [x] Dokter dashboard auto-kosong saat device offline
 - [x] `updateCharts(history)` — terima data langsung, bukan fetch terpisah
 - [x] ML prediction card di dashboard nakes/dokter
+- [x] Probability card di dashboard nakes/dokter (Membaik/Stabil/Memburuk % dengan progress bar)
 - [x] Chart.js initialization (HR, SpO2, Temperature)
 - [x] Superadmin manajemen-alat: polling auto-refresh device status
 
