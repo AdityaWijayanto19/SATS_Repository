@@ -11,6 +11,7 @@ class ApiKey extends Model
     protected $fillable = [
         'device_id',
         'key_hash',
+        'secret_key',
         'name',
         'is_active',
         'rate_limit_per_minute',
@@ -73,7 +74,7 @@ class ApiKey extends Model
         }
     }
 
-    public function updateLastUsed(string $ip = null): void
+    public function updateLastUsed(?string $ip = null): void
     {
         $this->update([
             'last_used' => now(),

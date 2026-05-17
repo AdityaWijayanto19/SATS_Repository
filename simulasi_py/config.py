@@ -4,11 +4,11 @@
 BASE_URL = "http://localhost:8000/api"
 
 # Ganti dengan data dari dashboard superadmin setelah tambah alat
-DEVICE_ID = "DEVICE_05"
-API_KEY = "sats_nqw3lRw2eHBUjXpYi0JoIJjcibfUaFIH"
+DEVICE_ID = "Device_01"
+API_KEY = "sats_L1Ag1U8idzSgPJ8W3MeEc7DI0ZcJmEum"
 
 # Interval pengiriman data (detik)
-SEND_INTERVAL = 5
+SEND_INTERVAL = 1
 
 # Konfigurasi sensor (range normal)
 SENSOR_CONFIG = {

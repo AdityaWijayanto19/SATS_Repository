@@ -17,11 +17,13 @@ class DeviceService
 
     public function __construct()
     {
-        $this->cache = Cache::store('file'); 
+        $this->cache = Cache::store('redis');
     }
 
     public function storeSystemStatus(array $data): SystemStatus
     {
+        Log::debug('Service: storeSystemStatus', $data);
+
         $status = SystemStatus::updateOrCreate(
             ['device_id' => $data['device_id']],
             [
@@ -32,7 +34,13 @@ class DeviceService
             ]
         );
 
-        // Clear cache
+        Log::channel('device-audit')->info('System status stored', [
+            'device_id' => $data['device_id'],
+            'monitoring_status' => $data['monitoring_status'],
+            'battery_level' => $data['battery_level'],
+            'signal_strength' => $data['signal_strength'],
+        ]);
+
         $this->clearSystemStatusCache($data['device_id']);
 
         return $status;
@@ -50,7 +58,7 @@ class DeviceService
         );
     }
 
-    public function getDeviceDetail(string $deviceId)
+    public function getDeviceDetail($deviceId)
     {
         return Devices::select('device_id', 'status', 'last_seen', 'created_at')
             ->with([

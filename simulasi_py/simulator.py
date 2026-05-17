@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import random
+import secrets
 import signal
 import sys
 import time
@@ -70,17 +71,18 @@ class SATSSimulator:
         self.log(f"Mengirim status sistem: battery={battery}%, signal={signal_strength}%")
         try:
             url = f"{self.base_url}/device/{self.device_id}/system-status"
-            response = requests.post(url, headers=self.headers, json={
+            headers = {**self.headers, "Idempotency-Key": self.generate_idempotency_key()}
+            response = requests.post(url, headers=headers, json={
                 "monitoring_status": "active",
                 "battery_level": battery,
                 "signal_strength": signal_strength,
             })
 
-            if response.status_code == 201:
+            if response.status_code in (200, 201, 202):
                 self.log("Status sistem terkirim", "SUCCESS")
                 return True
             else:
-                self.log(f"Gagal kirim status: {response.status_code}", "ERROR")
+                self.log(f"Gagal kirim status: {response.status_code} - {response.text}", "ERROR")
                 return False
         except Exception as e:
             self.log(f"Error: {e}", "ERROR")
@@ -124,6 +126,10 @@ class SATSSimulator:
             "status": status,
         }
 
+    def generate_idempotency_key(self) -> str:
+        """Generate unique idempotency key (32 hex chars)"""
+        return secrets.token_hex(16)
+
     def send_sensor_data(self) -> bool:
         """Kirim data sensor ke server"""
         data = self.generate_sensor_data()
@@ -137,9 +143,10 @@ class SATSSimulator:
 
         try:
             url = f"{self.base_url}/device/{self.device_id}/sensor-data"
-            response = requests.post(url, headers=self.headers, json=data)
+            headers = {**self.headers, "Idempotency-Key": self.generate_idempotency_key()}
+            response = requests.post(url, headers=headers, json=data)
 
-            if response.status_code == 201:
+            if response.status_code in (200, 201, 202):
                 return True
             elif response.status_code == 401:
                 self.log("API key tidak valid atau expired!", "ERROR")

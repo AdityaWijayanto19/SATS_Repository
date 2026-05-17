@@ -127,6 +127,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'device-audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/device-audit.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 90, // Keep 90 days of audit logs
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
