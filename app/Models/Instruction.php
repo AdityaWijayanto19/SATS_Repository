@@ -11,15 +11,14 @@ class Instruction extends Model
 
     protected $fillable = [
         'device_id',
-        'user_id',
-        'instruksi_dokter',      // Updated: was 'teks'
-        'respon_nakes',          // Updated: was 'respon'
-        'laporan_nakes',         // New field
+        'instruksi_dokter',
+        'respon_nakes',
+        'laporan_nakes',
         'is_completed',
         'completed_by',
         'completed_at',
-        'nakes_id',              // New field
-        'dokter_id',             // New field
+        'nakes_id',
+        'dokter_id',
     ];
 
     protected $casts = [
@@ -37,12 +36,6 @@ class Instruction extends Model
     public function nakes()
     {
         return $this->belongsTo(User::class, 'nakes_id')->select('id', 'name');
-    }
-
-    // Relasi: user yang membuat instruksi (fallback ke user_id)
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'user_id')->select('id', 'name');
     }
 
     public function device()

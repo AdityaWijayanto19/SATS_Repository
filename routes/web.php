@@ -31,6 +31,9 @@ Route::middleware(['auth'])->group(function () {
     // Nakes Routes
     Route::prefix('nakes')->middleware('role:nakes')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dashboard');
+        Route::post('/device-config', [DashboardController::class, 'saveDeviceConfig'])->name('nakes.device-config.store');
+        Route::delete('/device-config', [DashboardController::class, 'resetDeviceConfig'])->name('nakes.device-config.reset');
+        Route::patch('/device-status', [DashboardController::class, 'toggleDeviceStatus'])->name('nakes.device-status.toggle');
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('input-data-pasien');
         // Route::get('/laporan', [DashboardController::class, 'viewLaporanPage'])->name('laporan');
         Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');

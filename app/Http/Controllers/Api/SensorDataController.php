@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Services\SensorService;
+use App\Services\PatientMonitoringService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSensorDataRequest;
 use App\Jobs\ProcessSensorData;
@@ -77,6 +78,30 @@ class SensorDataController extends Controller
                 'temperature' => $data->pluck('temperature'),
                 'status' => $data->pluck('status'),
             ],
+        ], 200);
+    }
+
+    /**
+     * GET /api/device/{deviceId}/prediction
+     *
+     * Ambil prediksi ML untuk device. Menggunakan cache 2 menit.
+     * Dipanggil oleh dashboard frontend untuk menampilkan prediksi.
+     */
+    public function getPrediction(string $deviceId): JsonResponse
+    {
+        $mlService = app(PatientMonitoringService::class);
+        $prediction = $mlService->getPredictionForDevice($deviceId);
+
+        if (!$prediction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data prediksi belum tersedia. Minimal 5 data sensor diperlukan.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $prediction,
         ], 200);
     }
 }

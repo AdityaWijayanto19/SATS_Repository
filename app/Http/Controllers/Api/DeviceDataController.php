@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSystemStatusRequest;
 use App\Jobs\ProcessDeviceData;
+use App\Models\Devices;
 use App\Services\DeviceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -94,6 +95,26 @@ class DeviceDataController extends Controller
                 ],
                 'status' => $device->status,
                 'battery_level' => $device->systemStatus?->battery_level,
+            ],
+        ], 200);
+    }
+
+    public function getDeviceStatus(string $deviceId): JsonResponse
+    {
+        $device = Devices::where('device_id', $deviceId)->first();
+
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'device_id' => $device->device_id,
+                'status' => $device->status,
             ],
         ], 200);
     }

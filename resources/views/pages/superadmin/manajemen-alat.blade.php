@@ -289,6 +289,37 @@
             copied: false,
             form: { id: '', nama: '' },
             newDevice: { device_id: '', api_key: '' },
+            pollingInterval: null,
+
+            init() {
+                this.startPolling();
+            },
+
+            startPolling() {
+                this.pollingInterval = setInterval(async () => {
+                    try {
+                        const res = await fetch('/api/devices');
+                        const json = await res.json();
+                        if (json.success && json.data) {
+                            json.data.forEach(apiDevice => {
+                                const existing = this.devices.find(d => d.id === apiDevice.device_id);
+                                if (existing) {
+                                    existing.status = apiDevice.status;
+                                    existing.urgensi = apiDevice.latest?.status || 'normal';
+                                    existing.terakhirAktif = apiDevice.latest?.created_at || existing.terakhirAktif;
+                                    existing.keterangan = apiDevice.status === 'online' ? 'Aktif monitoring' : 'Tidak aktif';
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        // silent
+                    }
+                }, 3000);
+            },
+
+            destroy() {
+                if (this.pollingInterval) clearInterval(this.pollingInterval);
+            },
 
             showDetail(index) {
                 this.selectedDevice = this.devices[index];

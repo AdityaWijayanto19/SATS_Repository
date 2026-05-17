@@ -7,7 +7,7 @@
         <div class="flex items-start justify-between mb-5">
             <div>
                 <h1 class="text-xl font-medium text-[rgb(0,62,48)]">Dashboard Monitoring</h1>
-                <p class="text-sm text-gray-400 mt-1" x-text="selectedDeviceId"></p>
+                <p class="text-sm text-gray-400 mt-1" x-text="selectedDeviceId ?? 'Belum memilih perangkat'"></p>
             </div>
 
             <div class="relative">
@@ -27,12 +27,29 @@
                             class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer text-[rgb(0,62,48)]"
                             x-text="device.device_id"></div>
                     </template>
+                    <div x-show="allDevices.length === 0" class="px-4 py-3 text-sm text-gray-400 text-center">
+                        Tidak ada perangkat online
+                    </div>
                 </div>
             </div>
         </div>
 
+        {{-- Peringatan: Belum Pilih Perangkat --}}
+        <div x-show="!selectedDeviceId" x-transition
+            class="flex flex-col items-center justify-center py-20">
+            <div class="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center mb-5">
+                <svg class="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+            </div>
+            <h2 class="text-lg font-semibold text-gray-700 mb-2">Belum Ada Perangkat Dipilih</h2>
+            <p class="text-sm text-gray-400 text-center max-w-md">
+                Pilih perangkat yang sedang online dari dropdown di atas untuk memulai monitoring vital sign pasien.
+            </p>
+        </div>
+
         {{-- Stat Card (4 Kolom) --}}
-        <div class="grid grid-cols-4 gap-3 mb-4">
+        <div x-show="selectedDeviceId" x-transition class="grid grid-cols-4 gap-3 mb-4">
 
             {{-- Heart Rate --}}
             <div class="bg-red-50 rounded-xl p-4 border border-red-200">
@@ -84,28 +101,34 @@
         </div>
 
         {{-- Prediksi Machine Learning --}}
-        <div
+        <div x-show="selectedDeviceId" x-transition
             class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
-            <span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>
+            <span class="w-2 h-2 rounded-full flex-shrink-0"
+                :class="{
+                    'bg-green-400': latest?.ml_condition === 'NORMAL',
+                    'bg-orange-400': latest?.ml_condition === 'WARNING',
+                    'bg-red-400': latest?.ml_condition === 'CRITICAL',
+                    'bg-gray-300': !latest?.ml_condition
+                }"></span>
             <div class="flex-1">
                 <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
                 <p class="text-sm font-medium text-[rgb(0,62,48)]">
-                    <span x-show="latest?.prediction" x-text="latest?.prediction"></span>
-                    <span x-show="!latest?.prediction">Data prediksi belum tersedia.</span>
+                    <span x-show="latest?.ml_prediction" x-text="latest?.ml_prediction"></span>
+                    <span x-show="!latest?.ml_prediction">Data prediksi belum tersedia.</span>
                 </p>
             </div>
-            <span class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
+            <span x-show="latest?.ml_condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
                 :class="{
-                    'bg-green-100 text-green-700': latest?.status === 'normal',
-                    'bg-orange-100 text-orange-700': latest?.status === 'warning',
-                    'bg-red-100 text-red-700': latest?.status === 'critical'
+                    'bg-green-100 text-green-700': latest?.ml_condition === 'NORMAL',
+                    'bg-orange-100 text-orange-700': latest?.ml_condition === 'WARNING',
+                    'bg-red-100 text-red-700': latest?.ml_condition === 'CRITICAL'
                 }"
-                x-text="latest?.status === 'normal' ? 'Aman' : latest?.status === 'warning' ? 'Perhatian' : latest?.status === 'critical' ? 'Kritis' : '—'">
+                x-text="latest?.ml_risk_level ?? latest?.ml_condition">
             </span>
         </div>
 
         {{-- Grafik Sensor (3 Kolom) --}}
-        <div class="grid grid-cols-3 gap-3">
+        <div x-show="selectedDeviceId" x-transition class="grid grid-cols-3 gap-3">
             <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
                 <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
                     <p class="text-sm font-medium text-[rgb(0,62,48)]">Heart Rate</p>
@@ -138,7 +161,7 @@
         </div>
 
         {{-- Instruksi Dokter --}}
-        <div class="mt-4 mx-auto" x-data="instruksiDokter()" x-init="init()">
+        <div x-show="selectedDeviceId" x-transition class="mt-4 mx-auto" x-data="instruksiDokter()" x-init="init()">
             <div
                 class="bg-white rounded-2xl border border-[rgba(0,83,63,0.1)] shadow-sm overflow-hidden flex flex-col h-[80vh]">
 
@@ -263,24 +286,86 @@
             // Global state untuk share data antar Alpine components
             let globalSelectedDeviceId = null;
 
+            // Chart instances
+            let hrChart, spo2Chart, tempChart;
+
+            function initCharts() {
+                const chartOpts = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } },
+                        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 } } }
+                    },
+                    elements: { point: { radius: 2, hoverRadius: 4 }, line: { tension: 0.3, borderWidth: 2 } }
+                };
+
+                hrChart = new Chart(document.getElementById('hrChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 40, max: 160 } } }
+                });
+                spo2Chart = new Chart(document.getElementById('spo2Chart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 85, max: 100 } } }
+                });
+                tempChart = new Chart(document.getElementById('tempChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 35, max: 40 } } }
+                });
+            }
+
+            function updateCharts(history) {
+                if (!history) {
+                    [hrChart, spo2Chart, tempChart].forEach(c => {
+                        if (c) { c.data.labels = []; c.data.datasets[0].data = []; c.update('none'); }
+                    });
+                    return;
+                }
+                hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = history.heart_rate; hrChart.update('none');
+                spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = history.spo2; spo2Chart.update('none');
+                tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = history.temperature; tempChart.update('none');
+            }
+
             function dashboard() {
                 return {
                     allDevices: [],
                     selectedDeviceId: null,
                     dropdownOpen: false,
+                    latest: null,
 
                     async init() {
-                        // Ambil devices dari /api/devices
+                        initCharts();
+                        await this.fetchDevices();
+                        this.setupRealtime();
+                    },
+
+                    async fetchDevices() {
                         try {
                             const res = await fetch('/api/devices');
                             const json = await res.json();
                             if (json.success) {
-                                this.allDevices = json.data;
-                                if (this.allDevices.length > 0) {
-                                    this.selectedDeviceId = this.allDevices[0].device_id;
-                                    globalSelectedDeviceId = this.selectedDeviceId;
-                                    // Emit event agar instruksiDokter fetch instruksi
-                                    window.dispatchEvent(new CustomEvent('deviceSelected', { detail: { deviceId: this.selectedDeviceId } }));
+                                this.allDevices = json.data.filter(d => d.status === 'online');
+
+                                if (this.selectedDeviceId) {
+                                    const selected = this.allDevices.find(d => d.device_id === this.selectedDeviceId);
+                                    if (selected) {
+                                        this.latest = selected.latest;
+                                        updateCharts(selected.history);
+                                    } else {
+                                        this.selectedDeviceId = null;
+                                        globalSelectedDeviceId = null;
+                                        this.latest = null;
+                                        updateCharts(null);
+                                    }
+                                }
+
+                                if (!this.selectedDeviceId && this.allDevices.length > 0) {
+                                    this.selectDevice(this.allDevices[0].device_id);
                                 }
                             }
                         } catch (e) {
@@ -288,13 +373,56 @@
                         }
                     },
 
+                    setupRealtime() {
+                        if (!window.Echo) return;
+                        // Subscribe ke semua device untuk status changes
+                        this.subscribeAllDevices();
+                    },
+
+                    subscribeAllDevices() {
+                        const allDeviceIds = this.allDevices.map(d => d.device_id);
+                        if (this.selectedDeviceId && !allDeviceIds.includes(this.selectedDeviceId)) {
+                            allDeviceIds.push(this.selectedDeviceId);
+                        }
+
+                        allDeviceIds.forEach(deviceId => {
+                            window.Echo.private(`device.${deviceId}`)
+                                .listen('.device.status.changed', async (e) => {
+                                    if (e.status === 'offline') {
+                                        this.allDevices = this.allDevices.filter(d => d.device_id !== e.device_id);
+                                        if (this.selectedDeviceId === e.device_id) {
+                                            this.selectedDeviceId = null;
+                                            globalSelectedDeviceId = null;
+                                            this.latest = null;
+                                            updateCharts(null);
+                                        }
+                                    } else {
+                                        // Device online — refresh list + re-subscribe
+                                        await this.fetchDevices();
+                                        this.subscribeAllDevices();
+                                    }
+                                })
+                                .listen('.sensor.data.received', (e) => {
+                                    if (this.selectedDeviceId === e.device_id) {
+                                        this.latest = e.latest;
+                                        updateCharts(e.history);
+                                    }
+                                });
+                        });
+                    },
+
                     selectDevice(deviceId) {
                         this.selectedDeviceId = deviceId;
                         globalSelectedDeviceId = deviceId;
-                        console.log('Device selected:', deviceId);
-                        // Emit event agar instruksiDokter fetch instruksi device baru
+                        const selected = this.allDevices.find(d => d.device_id === deviceId);
+                        if (selected) {
+                            this.latest = selected.latest;
+                            updateCharts(selected.history);
+                        }
                         window.dispatchEvent(new CustomEvent('deviceSelected', { detail: { deviceId } }));
-                    }
+                    },
+
+                    destroy() {}
                 };
             }
 

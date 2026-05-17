@@ -15,7 +15,6 @@ class SensorData extends Model
         'spo2',
         'temperature',
         'status',
-        'prediction',
     ];
 
     protected $casts = [
@@ -57,7 +56,6 @@ class SensorData extends Model
             'spo2',
             'temperature',
             'status',
-            'prediction',
             'created_at'
         );
     }

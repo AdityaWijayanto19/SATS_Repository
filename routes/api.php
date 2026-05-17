@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\InstructionController;
 
 
 Route::post('/device/{device_id}/authenticate', [DeviceDataController::class, 'authenticate'])->middleware('apikey');
+Route::get('/device/{device_id}/status', [DeviceDataController::class, 'getDeviceStatus']);
 
 Route::prefix('device')->middleware('apikey')->group(function () {
 
@@ -14,8 +15,6 @@ Route::prefix('device')->middleware('apikey')->group(function () {
 
     Route::prefix('/{device_id}/sensor-data')->group(function () {
         Route::post('', [SensorDataController::class, 'storeSensorData']);
-        Route::get('/latest', [SensorDataController::class, 'getLatestSensorData']);
-        Route::get('/history', [SensorDataController::class, 'getSensorDataHistory']);
     });
 
     Route::prefix('/{device_id}/system-status')->group(function () {
@@ -36,4 +35,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     // Jangan lupa route sensor data juga diganti middlewarenya ke 'auth'
     Route::get('/device/{device}/sensor-data/history', [SensorDataController::class, 'getSensorDataHistory']);
     Route::get('/device/{device}/sensor-data/latest', [SensorDataController::class, 'getLatestSensorData']);
+
+    // Endpoint prediksi ML (session auth, dipanggil dashboard frontend)
+    Route::get('/device/{device}/prediction', [SensorDataController::class, 'getPrediction']);
 });

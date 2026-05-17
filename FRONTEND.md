@@ -108,11 +108,11 @@ resources/views/
 - [x] Halaman login + image slider
 - [x] Sistem auth (login, logout, forgot/reset password)
 - [x] Role middleware (nakes, dokter, superadmin)
-- [x] Dashboard nakes (terhubung ke API real, polling sensor data)
+- [x] Dashboard nakes (realtime via WebSocket, zero polling)
 - [x] Input data pasien nakes (UI form, belum ada backend POST)
 - [x] Laporan nakes (HTML + PDF, data dummy)
 - [x] Navbar & sidebar nakes (termasuk menu Instruksi)
-- [x] Dashboard dokter (terhubung ke API real, polling sensor data)
+- [x] Dashboard dokter (realtime via WebSocket, zero polling)
 - [x] Input data pasien dokter (UI form, sama seperti nakes)
 - [x] Laporan dokter (HTML + PDF, role-aware via LaporanController)
 - [x] Halaman instruksi nakes (chat-style, laporan + konfirmasi instruksi dokter)
@@ -131,16 +131,23 @@ resources/views/
 - [x] Bug fix: chart flickering (skip update jika data sama)
 - [x] Bug fix: polling interval seragam (5 detik)
 - [x] Fitur: dropdown device auto-update tanpa refresh
+- [x] Realtime updates via WebSocket (Reverb) — hapus semua polling dashboard
+- [x] Device status toggle (nakes: aktifkan/matikan perangkat)
+- [x] Optimistic update tombol toggle (langsung berubah, revert kalau gagal)
+- [x] Card + grafik sinkron (satu WebSocket event update keduanya)
+- [x] Dokter dashboard auto-kosong saat device offline
+- [x] `updateCharts(history)` — terima data langsung, bukan fetch terpisah
+- [x] ML prediction card di dashboard nakes/dokter
+- [x] Chart.js initialization (HR, SpO2, Temperature)
+- [x] Superadmin manajemen-alat: polling auto-refresh device status
 
 ### Belum Dikerjakan
 - [ ] Backend untuk input data pasien (POST route + controller)
 - [ ] Route untuk UserController (CRUD user belum terhubung ke UI)
 - [ ] Laporan dari database (masih dummy data)
 - [ ] Integrasi IoT real (simulator sudah ada, hardware belum)
-- [ ] Machine Learning (prediksi kondisi pasien)
 - [ ] Notifikasi instruksi terkirim (toast/snackbar)
 - [ ] Warning/highlight saat instruksi diselesaikan nakes
-- [ ] Listener broadcasting di frontend (Reverb sudah terkonfigurasi)
 
 ---
 
@@ -170,8 +177,10 @@ resources/views/
 
 ## Notes
 
-- Dashboard nakes & dokter **terhubung ke API real** (polling 5 detik)
-- Dropdown device **auto-update** tanpa refresh halaman (polling `/api/devices` 10 detik)
+- Dashboard nakes & dokter **realtime via WebSocket** (Reverb, zero polling)
+- Nakes dashboard: subscribe `device.{deviceId}` untuk status + sensor events
+- Dokter dashboard: subscribe semua device channels untuk status + sensor events
+- Superadmin manajemen-alat: polling `/api/devices` setiap 3 detik (satu-satunya polling)
 - Sidebar `components/sidebar.blade.php` sudah dinamis berdasarkan role (nakes/dokter/superadmin)
 - Menu Instruksi tersedia di sidebar nakes dan dokter
 - Navbar menampilkan nama user + role (dengan `ucfirst()`)
@@ -182,4 +191,5 @@ resources/views/
 - Manajemen user: UI ada, backend ada, route belum didaftarkan
 - Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)
 - Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware
-- Broadcasting via Reverb sudah terkonfigurasi di backend, perlu listener di frontend
+- `updateCharts()` di kedua dashboard menerima data langsung (bukan fetch terpisah)
+- `toggleDevice()` pakai optimistic update (langsung berubah, revert kalau gagal)

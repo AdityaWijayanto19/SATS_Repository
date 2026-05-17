@@ -15,6 +15,9 @@ class Devices extends Model
         'device_id',
         'status',
         'last_seen',
+        'ml_prediction',
+        'ml_condition',
+        'ml_risk_level',
     ];
 
     public function sensorData()
@@ -40,10 +43,5 @@ class Devices extends Model
     public function medicalRecords()
     {
         return $this->hasMany(MedicalRecord::class, 'device_id', 'device_id');
-    }
-
-    public function commands()
-    {
-        return $this->hasMany(Command::class, 'device_id', 'device_id');
     }
 }

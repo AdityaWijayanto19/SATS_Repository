@@ -18,18 +18,46 @@ class UserSeeder extends Seeder
             'role' => 'superadmin',
         ]);
 
-        // Dokter
+        // Dokter (3 akun)
         User::create([
-            'name' => 'Dr. Andi',
+            'name' => 'Dr. Andi Wijaya',
             'email' => 'andi@sats.id',
             'password' => Hash::make('password'),
             'role' => 'dokter',
         ]);
 
-        // Nakes (perawat)
+        User::create([
+            'name' => 'Dr. Budi Santoso',
+            'email' => 'budi@sats.id',
+            'password' => Hash::make('password'),
+            'role' => 'dokter',
+        ]);
+
+        User::create([
+            'name' => 'Dr. Citra Dewi',
+            'email' => 'citra@sats.id',
+            'password' => Hash::make('password'),
+            'role' => 'dokter',
+        ]);
+
+        // Nakes (3 akun)
         User::create([
             'name' => 'Suster Rina',
             'email' => 'rina@sats.id',
+            'password' => Hash::make('password'),
+            'role' => 'nakes',
+        ]);
+
+        User::create([
+            'name' => 'Perawat Dian',
+            'email' => 'dian@sats.id',
+            'password' => Hash::make('password'),
+            'role' => 'nakes',
+        ]);
+
+        User::create([
+            'name' => 'Perawat Eka',
+            'email' => 'eka@sats.id',
             'password' => Hash::make('password'),
             'role' => 'nakes',
         ]);

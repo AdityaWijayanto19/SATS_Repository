@@ -57,11 +57,14 @@ app/
     DeviceService.php                   # Sensor data CRUD + caching
     UserService.php                     # User CRUD
     InstructionService.php              # Instruksi dokter-nakes business logic
-    SensorService.php                   # Sensor data operations + caching
+    SensorService.php                   # Sensor data operations + caching + broadcast
+    PatientMonitoringService.php        # Integrasi ML API (Hugging Face)
   Events/
     InstructionSent.php                 # Broadcast saat dokter kirim instruksi
     InstructionStatusUpdated.php        # Broadcast saat nakes selesaikan instruksi
     InstructionReportSubmitted.php      # Broadcast saat nakes submit laporan
+    DeviceStatusChanged.php             # Broadcast saat device online/offline
+    SensorDataReceived.php              # Broadcast saat data sensor masuk
   Jobs/
     ProcessDeviceData.php               # Queue: proses system status device
     ProcessSensorData.php               # Queue: proses sensor data
@@ -124,10 +127,14 @@ simulasi_py/
 | POST | `/api/device/{id}/authenticate` | Autentikasi device |
 | GET | `/api/device/{id}/config` | Konfigurasi device (hardcoded) |
 | POST | `/api/device/{id}/sensor-data` | Kirim data sensor |
-| GET | `/api/device/{id}/sensor-data/latest` | Data sensor terbaru |
-| GET | `/api/device/{id}/sensor-data/history` | Riwayat sensor |
-| POST | `/api/device/{id}/system-status` | Kirim status sistem |
 | GET | `/api/device/{id}/system-status` | Ambil status sistem |
+| POST | `/api/device/{id}/system-status` | Kirim status sistem |
+
+### Device Status API (Public, no auth)
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| GET | `/api/device/{id}/status` | Cek status device (untuk simulator) |
 
 ### Instruction API (Session Auth)
 
@@ -143,9 +150,11 @@ simulasi_py/
 
 | Method | Endpoint | Keterangan |
 |--------|----------|------------|
-| GET | `/api/devices` | Daftar semua perangkat |
+| GET | `/api/devices` | Daftar semua perangkat + data card + history grafik |
 | GET | `/api/device/{id}/sensor-data/latest` | Data sensor terbaru (session auth) |
 | GET | `/api/device/{id}/sensor-data/history` | Riwayat sensor (session auth) |
+| GET | `/api/device/{id}/prediction` | Prediksi ML untuk device |
+| PATCH | `/nakes/device-status` | Toggle device online/offline (nakes) |
 
 ---
 
@@ -283,6 +292,38 @@ python simulator.py
   - Fix polling interval: seragam 5 detik (sebelumnya 2s/10s tidak konsisten)
   - Fix device list: polling `/api/devices` setiap 10 detik
 
+- [x] **Realtime Updates (17 Mei 2026)**
+  - Hapus polling dari nakes & dokter dashboard (ganti WebSocket)
+  - `DeviceStatusChanged` event → broadcast saat device online/offline
+  - `SensorDataReceived` event → broadcast data card + history grafik sekaligus
+  - Card dan grafik selalu sinkron (satu event update keduanya)
+  - Zero delay: nakes toggle → dokter langsung update, simulator langsung stop
+
+- [x] **Device Status Toggle**
+  - Nakes bisa aktifkan/matikan perangkat dari dashboard
+  - Tombol "Aktifkan Perangkat" / "Matikan Perangkat" (optimistic update)
+  - Simulator cek status via thread monitor terpisah (zero delay)
+  - Superadmin manajemen-alat auto-update status (WebSocket)
+
+- [x] **Multi-Device Simulator**
+  - 3 device paralel dengan profile berbeda (normal/warning/critical)
+  - Konfigurasi dari `devices.json`
+  - Thread monitor: status berubah → simulator langsung stop/start
+
+- [x] **API Key Pendek**
+  - Format: `sats_` + 8 karakter random (total 13 karakter)
+  - Lebih mudah dicatat untuk demo
+
+- [x] **Machine Learning Integration**
+  - Prediksi dari 3 vital sign: HR, SpO2, Temperature
+  - API Hugging Face Spaces (Gradio async 2-step)
+  - Hasil disimpan di tabel `devices` (persisten)
+  - Trigger setiap 5 data baru
+
+- [x] **Endpoint `/api/devices` Gabungan**
+  - Return data card (latest) + data grafik (history 10 menit) dalam satu response
+  - Parameter `?minutes=N` untuk rentang waktu grafik
+
 ### Belum Dikerjakan
 
 - [ ] **Backend Input Data Pasien**
@@ -313,25 +354,19 @@ python simulator.py
   - Perlu testing dengan hardware asli
   - Konfigurasi MQTT/HTTP pada device
 
-- [ ] **Machine Learning**
-  - Prediksi kondisi pasien
-  - Endpoint `/api/device/{id}/prediction`
-  - Integrasi model ML ke pipeline data
-
 ---
 
 ## Rencana Perbaikan (Prioritas)
 
-### 1. Realtime & Delay Fix
-- Kurangi delay pengiriman data simulator ke dashboard
-- Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif polling
-- Hapus atau kurangi cache TTL pada DeviceService (saat ini 5 menit)
+### 1. ~~Realtime & Delay Fix~~ (Selesai 17 Mei 2026)
+- ~~Kurangi delay pengiriman data simulator ke dashboard~~
+- ~~Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif polling~~ → WebSocket (Reverb)
+- ~~Hapus atau kurangi cache TTL pada DeviceService (saat ini 5 menit)~~
 
 ### 2. Notifikasi Instruksi
 - Notifikasi "Instruksi terkirim" saat dokter mengirim instruksi
 - Warning/highlight saat instruksi diselesaikan nakes
 - Badge counter instruksi aktif di sidebar
-- Listener broadcasting di frontend (Reverb sudah terkonfigurasi)
 
 ### 3. Backend Laporan
 - Aktifkan query database di LaporanController
@@ -354,10 +389,13 @@ python simulator.py
 - `UserController` punya method tapi belum ada route di `web.php`
 - `LaporanController` dan `SuperadminLaporanController` masih pakai dummy data
 - `DeviceDataController@getDeviceConfig` mengembalikan nilai hardcoded
-- Cache DeviceService: sensor data 5 menit, system status 2 menit — cleared on write
+- Cache SensorService: cleared on write (broadcast menggantikan polling)
 - System status menggunakan queue (`ProcessDeviceData`) untuk async processing
-- Broadcasting via Reverb sudah terkonfigurasi, perlu listener di frontend
+- Broadcasting via Reverb: 5 event (3 instruksi + 2 realtime dashboard)
+- Endpoint `/api/devices` return data gabungan: card + grafik dalam satu response
+- ML prediction disimpan di tabel `devices` (bukan `sensor_datas`)
+- Simulator pakai `threading.Event` untuk zero-delay stop saat device dimatikan
 
 ---
 
-*Last updated: 14 Mei 2026*
+*Last updated: 17 Mei 2026*

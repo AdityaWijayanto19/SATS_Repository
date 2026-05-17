@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Events\SensorDataReceived;
 use App\Models\Devices;
 use App\Models\SensorData;
+use App\Services\PatientMonitoringService;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Support\Facades\{Cache, log};
+use Illuminate\Support\Facades\{Cache, Log};
 use Carbon\Carbon;
 
 class SensorService
@@ -20,10 +22,9 @@ class SensorService
     public function storeSensorData(array $data): SensorData
     {
         Log::info('Service: mulai store sensor data', $data);
-        // Bulk update device status (more efficient than separate update)
+        // Update last_seen saja (status diatur oleh nakes via dashboard)
         Devices::where('device_id', $data['device_id'])
             ->update([
-                'status' => 'online',
                 'last_seen' => Carbon::now(),
             ]);
 
@@ -37,7 +38,94 @@ class SensorService
         // Clear cache untuk latest data device ini
         $this->clearLatestDataCache($data['device_id']);
 
+        // Broadcast data baru ke semua dashboard yang terhubung
+        broadcast(new SensorDataReceived($data['device_id'], $sensorData));
+
+        // Trigger prediksi ML di background (tidak blocking response)
+        // Hanya di-trigger setiap 5 data baru untuk menghindari API rate limit
+        $this->triggerPredictionIfNeeded($data['device_id']);
+
         return $sensorData;
+    }
+
+    /**
+     * Trigger prediksi ML jika sudah cukup data baru sejak prediksi terakhir.
+     * Cek tabel devices untuk ml_prediction, hitung data baru dari sensor_datas.
+     */
+    protected function triggerPredictionIfNeeded(string $deviceId): void
+    {
+        try {
+            $device = Devices::where('device_id', $deviceId)->first();
+
+            // Sudah ada prediksi → cek apakah ada 5 data baru sejak prediksi terakhir
+            if ($device && $device->ml_prediction) {
+                $newDataCount = SensorData::where('device_id', $deviceId)
+                    ->where('created_at', '>', $device->updated_at)
+                    ->count();
+
+                Log::info('ML trigger check', [
+                    'device_id' => $deviceId,
+                    'new_data_count' => $newDataCount,
+                    'has_prediction' => true,
+                ]);
+
+                if ($newDataCount >= 5) {
+                    Log::info('ML trigger: running prediction', ['device_id' => $deviceId]);
+                    $this->runPrediction($deviceId);
+                }
+                return;
+            }
+
+            // Belum ada prediksi → cek total data
+            $totalData = SensorData::where('device_id', $deviceId)->count();
+
+            Log::info('ML trigger check', [
+                'device_id' => $deviceId,
+                'total_data' => $totalData,
+                'has_prediction' => false,
+            ]);
+
+            if ($totalData >= 5) {
+                Log::info('ML trigger: running prediction (first time)', ['device_id' => $deviceId]);
+                $this->runPrediction($deviceId);
+            }
+        } catch (\Exception $e) {
+            Log::error('Trigger prediction error', [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Jalankan prediksi ML dan simpan hasilnya ke data sensor terbaru.
+     */
+    protected function runPrediction(string $deviceId): void
+    {
+        $mlService = app(PatientMonitoringService::class);
+        $prediction = $mlService->getPredictionForDevice($deviceId);
+
+        if (!$prediction) {
+            Log::warning('ML prediction returned null', ['device_id' => $deviceId]);
+            return;
+        }
+
+        // Simpan prediksi di tabel devices (selalu tersedia, tidak hilang saat data baru masuk)
+        Devices::where('device_id', $deviceId)->update([
+            'ml_prediction' => $prediction['prediction'],
+            'ml_condition'  => $prediction['condition'],
+            'ml_risk_level' => $prediction['risk_level'],
+        ]);
+
+        // Clear cache supaya dashboard dapat data terbaru
+        $this->clearLatestDataCache($deviceId);
+        Cache::forget("ml_prediction_{$deviceId}");
+
+        Log::info('ML prediction stored', [
+            'device_id' => $deviceId,
+            'condition' => $prediction['condition'],
+            'risk_level' => $prediction['risk_level'],
+        ]);
     }
 
     public function getLatestSensorData(string $deviceId): ?SensorData

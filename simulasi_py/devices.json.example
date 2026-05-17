@@ -1,0 +1,20 @@
+[
+  {
+    "device_id": "DEV_01",
+    "api_key": "sats_gantidenganapikey",
+    "profile": "normal",
+    "interval": 2
+  },
+  {
+    "device_id": "DEV_02",
+    "api_key": "sats_gantidenganapikey",
+    "profile": "warning",
+    "interval": 2
+  },
+  {
+    "device_id": "DEV_03",
+    "api_key": "sats_gantidenganapikey",
+    "profile": "critical",
+    "interval": 2
+  }
+]
