@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Instruksi')
 
 @section('content')
     <main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]">

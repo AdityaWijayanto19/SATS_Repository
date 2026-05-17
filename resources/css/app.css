@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Hide elements until Alpine.js initializes */
+[x-cloak] { display: none !important; }
+
+/* Disable transitions during initial page load to prevent sidebar glitch */
+body.no-transition > *:not(script),
+body.no-transition > *:not(script) * {
+    transition: none !important;
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source "../**/*.blade.php";

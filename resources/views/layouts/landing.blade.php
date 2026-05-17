@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>SATS - Smart Ambulance Telemedicine System</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <title>SATS Website</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>

@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Ambulance Telemedicine System</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <title>SATS Website</title>
     @vite('resources/css/app.css')
 </head>
 <body class="h-screen bg-[rgb(251, 242, 238)]">

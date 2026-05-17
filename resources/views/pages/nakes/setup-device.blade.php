@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Setup Device')
 
 @section('content')
     <main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)] flex items-center justify-center" x-data="setupDevice()">

@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Manajemen Alat')
 
 @section('content')
 <div class="min-h-full p-8" style="background: rgba(230,238,236,0.5);" x-data="manajemenAlat()">

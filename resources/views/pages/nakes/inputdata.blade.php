@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Input Data Pasien')
 
 @section('content')
     <main class="h-screen flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]">
