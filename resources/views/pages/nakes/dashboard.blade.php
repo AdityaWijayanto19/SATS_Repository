@@ -3,243 +3,209 @@
 @section('content')
     <main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]" x-data="dashboard()" x-init="init()">
 
-        {{-- Header --}}
+        {{-- Header: Selalu Muncul --}}
         <div class="flex items-start justify-between mb-5">
             <div>
                 <h1 class="text-xl font-medium text-[rgb(0,62,48)]">Dashboard Monitoring</h1>
-                <p class="text-sm text-gray-400 mt-1" x-text="selectedDeviceId ?? 'Belum ada perangkat'"></p>
+                <p class="text-sm text-gray-400 mt-1"
+                    x-text="apiKey ? 'Monitoring Real-time ID: ' + (selectedDeviceId ?? '...') : 'Silakan verifikasi API Key untuk memulai'">
+                </p>
             </div>
 
-            {{-- Dropdown Perangkat --}}
-            <div class="relative">
-                <button @click="dropdownOpen = !dropdownOpen"
-                    class="cursor-pointer px-4 py-2 bg-[rgb(0,62,48)] text-white rounded-lg flex items-center gap-2 text-sm hover:opacity-90 transition">
-                    Pilih Perangkat
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+            {{-- Tombol Logout Key: Hanya muncul jika sudah terhubung --}}
+            <template x-if="apiKey">
+                <button @click="logout()"
+                    class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition shadow-sm">
+                    Logout Key
                 </button>
+            </template>
+        </div>
 
-                <div x-show="dropdownOpen" x-transition @click.outside="dropdownOpen = false"
-                    class="absolute right-0 mt-2 w-52 bg-white border border-[rgba(0,83,63,0.15)] rounded-xl shadow-sm z-50 overflow-hidden">
-                    <template x-for="device in allDevices" :key="device.device_id">
-                        <div @click="selectDevice(device.device_id); dropdownOpen = false"
-                            class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer"
-                            :class="device.device_id === selectedDeviceId ? 'text-[rgb(0,62,48)] font-semibold' :
-                                'text-[rgb(0,62,48)]'"
-                            x-text="device.device_id"></div>
-                    </template>
+        {{-- 1. Tampilan Verifikasi (Placeholder Content) --}}
+        {{-- Muncul JIKA apiKey Belum Ada --}}
+        <div x-show="!apiKey" x-transition:enter="transition ease-out duration-300"
+            class="flex flex-col items-center justify-center min-h-[60vh] py-12">
+
+            <div class="bg-white rounded-3xl p-10 w-full max-w-lg shadow-sm border border-[rgba(0,83,63,0.1)] text-center">
+                <div class="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-[rgb(0,62,48)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+
+                <h2 class="text-2xl font-bold text-[rgb(0,62,48)] mb-2">Verifikasi Akses</h2>
+                <p class="text-sm text-gray-500 mb-8 px-4">Masukkan API Key monitoring dari Superadmin untuk mengakses data
+                    sensor real-time dan instruksi dokter.</p>
+
+                <form @submit.prevent="validateApiKey()" class="space-y-4 text-left">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">API Key Monitoring</label>
+                        <input type="password" x-model="apiKeyInput" placeholder="sats_xxxxxxxxxxxxx"
+                            class="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] transition-all"
+                            required>
+                    </div>
+
+                    <div x-show="apiKeyError" x-cloak
+                        class="text-xs text-red-500 bg-red-50 p-3 rounded-xl border border-red-100" x-text="apiKeyError">
+                    </div>
+
+                    <button type="submit" :disabled="apiKeyLoading"
+                        class="w-full bg-[rgb(0,62,48)] text-white py-3.5 rounded-2xl font-bold hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-emerald-900/20">
+                        <span x-show="!apiKeyLoading">Hubungkan Monitoring</span>
+                        <span x-show="apiKeyLoading" class="flex items-center justify-center gap-2">
+                            <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            Memverifikasi...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {{-- 2. Konten Utama (Monitoring & Chat) --}}
+        {{-- Muncul JIKA apiKey SUDAH Ada --}}
+        <div x-show="apiKey" x-cloak x-transition:enter="transition ease-out duration-500">
+
+            {{-- Stat Cards --}}
+            <div class="grid grid-cols-4 gap-3 mb-4">
+                {{-- Heart Rate --}}
+                <div class="bg-red-50 rounded-xl p-4 border border-red-200">
+                    <p class="text-xs font-medium text-red-400 mb-2">Heart Rate</p>
+                    <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                        <span x-text="latest?.heart_rate ?? '—'"></span>
+                        <span class="text-sm font-normal text-red-400">bpm</span>
+                    </p>
+                    <p class="text-[10px] mt-1" :class="getStatusClass(latest?.heart_rate, 'hr')"
+                        x-text="getStatusText(latest?.heart_rate, 'hr')"></p>
+                </div>
+
+                {{-- SpO2 --}}
+                <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <p class="text-xs font-medium text-blue-400 mb-2">SpO2</p>
+                    <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                        <span x-text="latest?.spo2 ?? '—'"></span>
+                        <span class="text-sm font-normal text-blue-400">%</span>
+                    </p>
+                    <p class="text-[10px] mt-1" :class="getStatusClass(latest?.spo2, 'spo2')"
+                        x-text="getStatusText(latest?.spo2, 'spo2')"></p>
+                </div>
+
+                {{-- Temperature --}}
+                <div class="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                    <p class="text-xs font-medium text-orange-400 mb-2">Temperature</p>
+                    <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                        <span x-text="latest?.temperature ?? '—'"></span>
+                        <span class="text-sm font-normal text-orange-400">°C</span>
+                    </p>
+                    <p class="text-[10px] mt-1" :class="getStatusClass(latest?.temperature, 'temp')"
+                        x-text="getStatusText(latest?.temperature, 'temp')"></p>
+                </div>
+
+                {{-- Kondisi Pasien --}}
+                <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
+                    <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
+                    <p class="text-2xl font-medium" :class="getKondisiClass(latest?.status)"
+                        x-text="statusLabel(latest?.status)"></p>
+                    <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">Update: <span
+                            x-text="formatTime(latest?.created_at)"></span></p>
                 </div>
             </div>
-        </div>
 
-        {{-- Stat Cards --}}
-        <div class="grid grid-cols-4 gap-3 mb-4">
-
-            {{-- Heart Rate --}}
-            <div class="bg-red-50 rounded-xl p-4 border border-red-200">
-                <p class="text-xs font-medium text-red-400 mb-2">Heart Rate</p>
-                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                    <span x-text="latest?.heart_rate ?? '—'"></span>
-                    <span class="text-sm font-normal text-red-400">bpm</span>
-                </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.heart_rate, 'hr')"
-                    x-text="getStatusText(latest?.heart_rate, 'hr')"></p>
-            </div>
-
-            {{-- SpO2 --}}
-            <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                <p class="text-xs font-medium text-blue-400 mb-2">SpO2</p>
-                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                    <span x-text="latest?.spo2 ?? '—'"></span>
-                    <span class="text-sm font-normal text-blue-400">%</span>
-                </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.spo2, 'spo2')"
-                    x-text="getStatusText(latest?.spo2, 'spo2')"></p>
-            </div>
-
-            {{-- Temperature --}}
-            <div class="bg-orange-50 rounded-xl p-4 border border-orange-200">
-                <p class="text-xs font-medium text-orange-400 mb-2">Temperature</p>
-                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                    <span x-text="latest?.temperature ?? '—'"></span>
-                    <span class="text-sm font-normal text-orange-400">°C</span>
-                </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.temperature, 'temp')"
-                    x-text="getStatusText(latest?.temperature, 'temp')"></p>
-            </div>
-
-            {{-- Kondisi Pasien --}}
-            <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
-                <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
-                <p class="text-2xl font-medium"
-                    :class="{
-                        'text-[rgb(0,62,48)]': latest?.status === 'normal',
-                        'text-orange-500': latest?.status === 'warning',
-                        'text-red-500': latest?.status === 'critical'
-                    }"
-                    x-text="latest?.status ? (latest.status.charAt(0).toUpperCase() + latest.status.slice(1)) : '—'"></p>
-                <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">
-                    Pembaruan: <span x-text="latest?.created_at ?? '—'"></span>
-                </p>
-            </div>
-
-        </div>
-
-        {{-- Prediksi ML --}}
-        <div
-            class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
-            <span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>
-
-            <div class="flex-1">
-                <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
-                <p class="text-sm font-medium text-[rgb(0,62,48)]">
-                    <span x-show="latest?.prediction" x-text="latest?.prediction"></span>
-                    <span x-show="!latest?.prediction">Data prediksi belum tersedia.</span>
-                </p>
-            </div>
-
-            <span class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
-                :class="{
-                    'bg-green-100 text-green-700': latest?.status === 'normal',
-                    'bg-orange-100 text-orange-700': latest?.status === 'warning',
-                    'bg-red-100 text-red-700': latest?.status === 'critical'
-                }"
-                x-text="statusLabel(latest?.status)"></span>
-        </div>
-
-        {{-- Grafik Sensor --}}
-        <div class="grid grid-cols-3 gap-3">
-
-            @foreach ([['id' => 'hrChart', 'label' => 'Heart Rate', 'unit' => 'bpm'], ['id' => 'spo2Chart', 'label' => 'SpO2', 'unit' => '%'], ['id' => 'tempChart', 'label' => 'Temperature', 'unit' => '°C']] as $chart)
-                <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
-                    <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
-                        <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $chart['label'] }}</p>
-                        <p class="text-[11px] text-gray-400 mt-0.5">{{ $chart['unit'] }} — 10 menit terakhir</p>
-                    </div>
-                    {{-- position:relative wajib agar Chart.js bisa hitung tinggi --}}
-                    <div class="p-4 relative" style="height:200px;">
-                        <canvas id="{{ $chart['id'] }}"></canvas>
-                    </div>
+            {{-- Prediksi ML --}}
+            <div
+                class="flex items-center gap-4 bg-white border border-[rgba(0,62,48,0.1)] rounded-xl px-5 py-3.5 mb-4 shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
+                <div class="flex-1">
+                    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Analisis Prediksi ML
+                    </p>
+                    <p class="text-sm font-medium text-[rgb(0,62,48)]"
+                        x-text="latest?.prediction ?? 'Menunggu data sensor...'"></p>
                 </div>
-            @endforeach
+            </div>
 
-        </div>
+            {{-- Grafik Sensor (3 Kolom) --}}
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                @foreach ([['id' => 'hrChart', 'label' => 'Heart Rate', 'unit' => 'bpm'], ['id' => 'spo2Chart', 'label' => 'SpO2', 'unit' => '%'], ['id' => 'tempChart', 'label' => 'Temperature', 'unit' => '°C']] as $chart)
+                    <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)] shadow-sm">
+                        <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.05)]">
+                            <p class="text-xs font-bold text-[rgb(0,62,48)] uppercase">{{ $chart['label'] }}</p>
+                        </div>
+                        <div class="p-4 relative" style="height:180px;">
+                            <canvas id="{{ $chart['id'] }}"></canvas>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
 
-        {{-- Instruksi dari Dokter --}}
-        <div class="mt-4 mx-auto" x-data="instruksiNakes()" x-init="init()">
+            {{-- Instruksi & Chat --}}
             <div
                 class="bg-white rounded-2xl border border-[rgba(0,83,63,0.1)] shadow-sm overflow-hidden flex flex-col h-[80vh]">
-
-                {{-- Header --}}
                 <div class="px-6 py-4 border-b border-[rgba(0,83,63,0.08)] bg-white flex items-center justify-between">
-                    <div>
-                        <h2 class="text-sm font-bold text-[rgb(0,62,48)]">Monitoring Ambulans: <span
-                                x-text="deviceId"></span></h2>
-                        <p class="text-[11px] text-gray-400">Lapor kejadian dan konfirmasi instruksi dokter</p>
-                    </div>
+                    <h2 class="text-sm font-bold text-[rgb(0,62,48)] uppercase tracking-tight">Instruksi & Laporan Medis
+                    </h2>
                 </div>
 
-                {{-- Chat Area dengan x-ref untuk Scroll --}}
-                <div x-ref="chatBox" class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 bg-gray-50/30 scroll-smooth">
-                    <template x-if="instruksi.length === 0">
-                        <div class="flex flex-col items-center justify-center h-full opacity-40">
-                            <p class="text-sm italic">Belum ada aktivitas instruksi.</p>
-                        </div>
-                    </template>
-
+                <div x-ref="chatBox" class="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-gray-50/30">
                     <template x-for="item in sortedInstruksi" :key="item.id">
-                        <div class="flex flex-col gap-3">
-
-                            {{-- 1. Laporan Nakes / Anda Sendiri (Sisi Kanan) --}}
-                            <div class="flex justify-end items-end gap-2"
-                                x-show="item.laporan_nakes && item.laporan_nakes !== '-'">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-end" x-show="item.laporan_nakes && item.laporan_nakes !== '-'">
                                 <div
-                                    class="max-w-[80%] bg-[rgb(0,83,63)] text-white p-4 rounded-2xl transition-all rounded-tr-none shadow-md relative">
-
-                                    <p class="text-sm leading-relaxed mb-2" x-text="item.laporan_nakes"></p>
-
-                                    {{-- Waktu Pojok Bawah --}}
-                                    <span class="absolute bottom-1 right-3 text-[9px] opacity-60"
-                                        x-text="item.waktu"></span>
-
+                                    class="max-w-[80%] bg-[rgb(0,83,63)] text-white p-3 rounded-2xl rounded-tr-none text-sm shadow-md">
+                                    <p x-text="item.laporan_nakes"></p>
+                                    <span class="text-[9px] opacity-60 block mt-1 text-right" x-text="item.waktu"></span>
                                 </div>
                             </div>
-
-                            {{-- 2. Instruksi Dokter (Sisi Kiri) --}}
-                            <template x-if="item.instruksi_dokter">
-                                <div class="flex justify-start items-end gap-2">
-                                    {{-- Avatar Dokter --}}
-                                    <div
-                                        class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mb-1">
-                                        DR
-                                    </div>
-
-                                    <div :class="item.is_completed ? 'bg-white opacity-90' : 'bg-white border-l-4 border-green-500'"
-                                        class="max-w-[75%] bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm relative transition-all">
-
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="text-[10px] font-bold text-green-900 uppercase tracking-tighter"
-                                                x-text="item.user_name || 'DOKTER SATS'"></span>
-                                        </div>
-
-                                        <p class="text-sm text-gray-800 font-normal mb-2" x-text="item.instruksi_dokter">
-                                        </p>
-
-                                        {{-- Waktu Pojok Bawah --}}
-                                        <span class="absolute bottom-1 right-3 text-[9px] text-gray-400"
-                                            x-text="item.waktu || ''"></span>
-
-                                        {{-- Area Respon (Tombol Tindakan) --}}
-                                        <div class="mt-1 pt-3 border-t border-dashed border-gray-100">
-                                            <template x-if="!item.is_completed">
-                                                <div class="flex flex-col gap-2">
-                                                    <p class="text-[9px] font-bold text-gray-400 uppercase">Respon Anda:
-                                                    </p>
-                                                    <div class="flex flex-wrap gap-2">
-                                                        <template
-                                                            x-for="opsi in ['Sudah dilakukan', 'Alat tidak ada', 'Gagal']">
-                                                            <button @click="item.selectedRespon = opsi; kirimRespon(item)"
-                                                                class="text-[10px] px-3 py-1.5 rounded-full border border-green-100 bg-green-50 text-green-900 font-bold hover:bg-green-600 hover:text-white transition-all">
-                                                                <span x-text="opsi"></span>
-                                                            </button>
-                                                        </template>
-                                                    </div>
-                                                </div>
-                                            </template>
-
-                                            {{-- Jika Sudah Selesai --}}
-                                            <template x-if="item.is_completed">
-                                                <div
-                                                    class="flex items-center gap-2 text-green-900 mb-2 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path
-                                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z">
-                                                        </path>
-                                                    </svg>
-                                                    <span class="text-[10px] font-bold tracking-wide"
-                                                        x-text="'DIKONFIRMASI: ' + item.respon_nakes"></span>
-                                                </div>
-                                            </template>
-                                        </div>
+                            <div class="flex justify-start items-end gap-2" x-show="item.instruksi_dokter">
+                                <div
+                                    class="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[9px] font-bold">
+                                    DR</div>
+                                <div
+                                    class="max-w-[80%] bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm">
+                                    <p class="text-[10px] font-bold text-emerald-800 mb-1"
+                                        x-text="item.user_name || 'DOKTER SATS'"></p>
+                                    <p class="text-sm text-gray-800" x-text="item.instruksi_dokter"></p>
+                                    <div class="mt-3 pt-2 border-t border-dashed border-gray-100">
+                                        <template x-if="!item.is_completed">
+                                            <div class="flex flex-wrap gap-2">
+                                                <template x-for="opsi in ['Sudah dilakukan', 'Alat tidak ada', 'Gagal']">
+                                                    <button @click="kirimRespon(item, opsi)"
+                                                        class="text-[9px] px-3 py-1 rounded-full border border-emerald-100 bg-emerald-50 text-emerald-800 font-bold hover:bg-emerald-600 hover:text-white transition-all">
+                                                        <span x-text="opsi"></span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="item.is_completed">
+                                            <div
+                                                class="flex items-center gap-1 text-emerald-700 text-[10px] font-bold bg-emerald-50 p-1.5 rounded-lg border border-emerald-100">
+                                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path
+                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z">
+                                                    </path>
+                                                </svg>
+                                                <span x-text="'DIKONFIRMASI: ' + item.respon_nakes"></span>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
-                            </template>
-
+                            </div>
                         </div>
                     </template>
                 </div>
 
-                {{-- Input Bar (Bottom) --}}
                 <div class="px-5 py-3.5 border-t border-[rgba(0,83,63,0.08)] bg-gray-50/50">
                     <div class="flex gap-3">
-                        <textarea x-model="laporanBaru" rows="1" @input="autoResize($el)"
-                            placeholder="Ctrl + Enter untuk kirim"
-                            class="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all"
+                        <textarea x-model="laporanBaru" placeholder="Ctrl + Enter untuk kirim" rows="1"
+                            class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                             @keydown.ctrl.enter="kirimLaporan()"></textarea>
                         <button @click="kirimLaporan()" :disabled="!laporanBaru.trim() || isSending"
-                            class="self-end p-2.5 bg-[rgb(0,83,63)] text-white rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-md">
+                            class="self-end p-2.5 bg-[rgb(0,83,63)] text-white rounded-xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                             <template x-if="!isSending">
                                 <svg class="w-5 h-5 rotate-90" fill="currentColor" viewBox="0 0 20 20">
                                     <path
@@ -253,154 +219,197 @@
                         </button>
                     </div>
                 </div>
-
             </div>
         </div>
-
     </main>
 
     @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
         <script>
-            // Global state untuk share data antar Alpine components
-            let globalSelectedDeviceId = null;
-
             function dashboard() {
                 return {
-                    allDevices: [],
-                    selectedDeviceId: null,
-                    dropdownOpen: false,
-
-                    async init() {
-                        // Ambil devices dari /api/devices
-                        try {
-                            const res = await fetch('/api/devices');
-                            const json = await res.json();
-                            if (json.success) {
-                                this.allDevices = json.data;
-                                if (this.allDevices.length > 0) {
-                                    this.selectedDeviceId = this.allDevices[0].device_id;
-                                    globalSelectedDeviceId = this.selectedDeviceId;
-                                    // Emit event agar instruksiDokter fetch instruksi
-                                    window.dispatchEvent(new CustomEvent('deviceSelected', {
-                                        detail: {
-                                            deviceId: this.selectedDeviceId
-                                        }
-                                    }));
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Error fetching devices:', e);
-                        }
+                    apiKey: localStorage.getItem('monitoringApiKey') || null,
+                    apiKeyInput: '',
+                    apiKeyError: '',
+                    apiKeyLoading: false,
+                    selectedDeviceId: localStorage.getItem('selectedMonitoringDevice') || null,
+                    latest: null,
+                    chartData: {
+                        heartRate: [],
+                        spo2: [],
+                        temperature: [],
+                        labels: []
                     },
-
-                    selectDevice(deviceId) {
-                        this.selectedDeviceId = deviceId;
-                        globalSelectedDeviceId = deviceId;
-                        console.log('Device selected:', deviceId);
-                        // Emit event agar instruksiDokter fetch instruksi device baru
-                        window.dispatchEvent(new CustomEvent('deviceSelected', {
-                            detail: {
-                                deviceId
-                            }
-                        }));
-                    }
-                };
-            }
-
-            function instruksiNakes() {
-                return {
+                    charts: {
+                        hrChart: null,
+                        spo2Chart: null,
+                        tempChart: null
+                    },
+                    maxDataPoints: 30,
                     instruksi: [],
                     laporanBaru: '',
                     isSending: false,
-                    deviceId: null,
                     notificationSound: new Audio('/assets/sounds/notification.mp3'),
 
-                    scrollToBottom() {
-                        this.$nextTick(() => {
-                            const container = this.$refs.chatBox;
-                            if (container) {
-                                container.scrollTop = container.scrollHeight;
-                            }
+                    buildHeaders() {
+                        return {
+                            'X-API-Key': this.apiKey,
+                            'Accept': 'application/json'
+                        };
+                    },
+                    formatTime(ds) {
+                        if (!ds) return '';
+                        return new Date(ds).toLocaleTimeString('id-ID', {
+                            hour: '2-digit',
+                            minute: '2-digit'
                         });
                     },
 
-                    autoResize(el) {
-                        el.style.height = 'auto';
-                        el.style.height = el.scrollHeight + 'px';
+                    async init() {
+                        if (this.apiKey) {
+                            const success = await this.fetchAndSetDevice();
+                            if (success && this.selectedDeviceId) {
+                                await this.loadAllData();
+                            }
+                        }
+                    },
+
+                    async validateApiKey() {
+                        this.apiKeyError = '';
+                        this.apiKeyLoading = true;
+                        try {
+                            const res = await fetch('/api/device', {
+                                headers: {
+                                    'X-API-Key': this.apiKeyInput.trim()
+                                }
+                            });
+                            const json = await res.json();
+                            if (json.success && json.data.length > 0) {
+                                this.apiKey = this.apiKeyInput.trim();
+                                localStorage.setItem('monitoringApiKey', this.apiKey);
+                                this.selectedDeviceId = json.data[0].device_id;
+                                localStorage.setItem('selectedMonitoringDevice', this.selectedDeviceId);
+                                await this.loadAllData();
+                            } else {
+                                this.apiKeyError = (json.data && json.data.length === 0) ?
+                                    'Key tidak terhubung ke perangkat.' : 'API Key tidak valid.';
+                            }
+                        } catch (e) {
+                            this.apiKeyError = 'Gagal terhubung ke server.';
+                        } finally {
+                            this.apiKeyLoading = false;
+                        }
+                    },
+
+                    async fetchAndSetDevice() {
+                        try {
+                            const res = await fetch('/api/device', {
+                                headers: this.buildHeaders()
+                            });
+                            const json = await res.json();
+                            if (res.status === 401) {
+                                this.logout();
+                                return false;
+                            }
+                            if (json.success && json.data.length > 0) {
+                                this.selectedDeviceId = json.data[0].device_id;
+                                return true;
+                            }
+                        } catch (e) {
+                            console.error(e);
+                        }
+                        return false;
+                    },
+
+                    async loadAllData() {
+                        this.resetCharts();
+                        try {
+                            const [resHist, resLat, resChat] = await Promise.all([
+                                fetch(`/api/device/${this.selectedDeviceId}/sensor-data/history?minutes=1440`, {
+                                    headers: this.buildHeaders()
+                                }),
+                                fetch(`/api/device/${this.selectedDeviceId}/sensor-data/latest`, {
+                                    headers: this.buildHeaders()
+                                }),
+                                fetch(`/api/instruction?device_id=${this.selectedDeviceId}`)
+                            ]);
+                            const jHist = await resHist.json();
+                            const jLat = await resLat.json();
+                            const jChat = await resChat.json();
+
+                            if (jLat.success) this.latest = jLat.data;
+                            if (jHist.success && jHist.data.labels) {
+                                this.chartData.labels = jHist.data.labels.map(l => this.formatTime(l));
+                                this.chartData.heartRate = jHist.data.heart_rate;
+                                this.chartData.spo2 = jHist.data.spo2;
+                                this.chartData.temperature = jHist.data.temperature;
+                            }
+                            if (jChat.success) this.instruksi = jChat.data;
+
+                        } catch (e) {
+                            console.error('Load Error:', e);
+                        }
+
+                        this.$nextTick(() => {
+                            this.initCharts();
+                            this.setupWebSocket();
+                            this.scrollToBottom();
+                        });
+                    },
+
+                    initCharts() {
+                        this.createChart('hrChart', 'Heart Rate', '#dc2626', [...this.chartData.heartRate]);
+                        this.createChart('spo2Chart', 'SpO2', '#2563eb', [...this.chartData.spo2]);
+                        this.createChart('tempChart', 'Temp', '#ea580c', [...this.chartData.temperature]);
+                    },
+
+                    createChart(canvasId, label, color, data) {
+                        const ctx = document.getElementById(canvasId)?.getContext('2d');
+                        if (!ctx) return;
+                        this.charts[canvasId] = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: [...this.chartData.labels],
+                                datasets: [{
+                                    label,
+                                    data,
+                                    borderColor: color,
+                                    backgroundColor: color + '15',
+                                    fill: true,
+                                    tension: 0.3,
+                                    pointRadius: 2
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: false
+                                    },
+                                    x: {
+                                        ticks: {
+                                            maxTicksLimit: 6
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        });
                     },
 
                     get sortedInstruksi() {
                         return [...this.instruksi].sort((a, b) => (a.id || 0) - (b.id || 0));
                     },
 
-                    async init() {
-                        // Listen ketika device dipilih dari dashboard
-                        window.addEventListener('deviceSelected', async (e) => {
-                            const deviceId = e.detail.deviceId;
-                            this.deviceId = deviceId;
-                            console.log('instruksiNakes: Device changed to:', deviceId);
-                            await this.getHistory();
-                            this.setupReverb();
-                            setTimeout(() => this.scrollToBottom(), 300);
-                        });
-                    },
-
-                    setupReverb() {
-                        if (!window.Echo) return;
-                        if (!this.deviceId) {
-                            console.warn('instruksiNakes: deviceId not set yet');
-                            return;
-                        }
-
-                        console.log('instruksiNakes: Subscribe ke channel device.' + this.deviceId);
-
-                        window.Echo.private(`device.${this.deviceId}`)
-                            .listen('.instruction.created', (e) => {
-                                const exists = this.instruksi.some(i => i.id === e.instruction.id);
-                                if (!exists) {
-                                    this.instruksi.push({
-                                        ...e.instruction,
-                                        selectedRespon: ''
-                                    });
-                                    this.notificationSound.play().catch(() => {});
-                                    this.scrollToBottom();
-                                }
-                            });
-                    },
-
-                    async getHistory() {
-                        if (!this.deviceId) {
-                            console.warn('instruksiNakes: deviceId not set yet');
-                            return;
-                        }
-
-                        try {
-                            const res = await fetch(`/api/instruction?device_id=${this.deviceId}`);
-                            const json = await res.json();
-                            console.log(`[getHistory] device=${this.deviceId}:`, json);
-                            if (json.success) {
-                                this.instruksi = json.data.map(item => ({
-                                    ...item,
-                                    selectedRespon: ''
-                                }));
-                            }
-                        } catch (e) {
-                            console.error('History Error:', e);
-                        }
-                    },
-
                     async kirimLaporan() {
-                        if (!this.laporanBaru.trim() || this.isSending || !this.deviceId) return;
-
-                        // Waktu real-time untuk local update
+                        if (!this.laporanBaru.trim() || this.isSending) return;
                         this.isSending = true;
-                        const sekarang = new Date().toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-
                         try {
                             const res = await fetch(`/api/instruction/report`, {
                                 method: 'POST',
@@ -409,38 +418,28 @@
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                                 },
                                 body: JSON.stringify({
-                                    device_id: this.deviceId,
+                                    device_id: this.selectedDeviceId,
                                     laporan_nakes: this.laporanBaru,
-                                    waktu: sekarang
+                                    waktu: new Date().toLocaleTimeString('id-ID', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })
                                 })
                             });
-
                             const json = await res.json();
                             if (json.success) {
-                                this.laporanBaru = '';
                                 this.instruksi.push(json.data);
+                                this.laporanBaru = '';
                                 this.scrollToBottom();
-
-                                // Reset textarea height
-                                const ta = document.querySelector('textarea');
-                                if (ta) ta.style.height = 'auto';
                             }
-
-                            this.laporanBaru = '';
-                            this.$nextTick(() => {
-                                const el = document.querySelector('textarea');
-                                if (el) el.style.height = 'auto';
-                            });
                         } catch (e) {
-                            console.error('Laporan Error:', e);
+                            console.error(e);
                         } finally {
                             this.isSending = false;
                         }
                     },
 
-                    async kirimRespon(item) {
-                        if (!item.selectedRespon || !this.deviceId) return;
-
+                    async kirimRespon(item, opsi) {
                         try {
                             const res = await fetch(`/api/instruction/${item.id}/complete`, {
                                 method: 'PATCH',
@@ -449,24 +448,106 @@
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                                 },
                                 body: JSON.stringify({
-                                    respon_nakes: item.selectedRespon
+                                    respon_nakes: opsi
                                 })
                             });
-
                             const json = await res.json();
                             if (json.success) {
                                 item.is_completed = true;
-                                item.respon_nakes = item.selectedRespon;
-                                this.instruksi = [...this.instruksi];
-                                this.scrollToBottom();
+                                item.respon_nakes = opsi;
                             }
                         } catch (e) {
-                            console.error('Respon Error:', e);
-                        } finally {
-                            this.isSending = false;
+                            console.error(e);
                         }
+                    },
+
+                    setupWebSocket() {
+                        if (!window.Echo || !this.selectedDeviceId) return;
+                        window.Echo.leaveAllChannels();
+                        window.Echo.private(`device.${this.selectedDeviceId}`)
+                            .listen('.sensor.received', (e) => {
+                                this.onSensorReceived(e.sensor);
+                            })
+                            .listen('.instruction.created', (e) => {
+                                const exists = this.instruksi.some(i => i.id === e.instruction.id);
+                                if (!exists) {
+                                    this.instruksi.push(e.instruction);
+                                    this.notificationSound.play().catch(() => {});
+                                    this.scrollToBottom();
+                                }
+                            });
+                    },
+
+                    onSensorReceived(sensor) {
+                        this.latest = {
+                            ...sensor,
+                            created_at: sensor.timestamp
+                        };
+                        const time = this.formatTime(sensor.timestamp);
+                        this.chartData.labels.push(time);
+                        this.chartData.heartRate.push(sensor.heart_rate);
+                        this.chartData.spo2.push(sensor.spo2);
+                        this.chartData.temperature.push(sensor.temperature);
+                        if (this.chartData.labels.length > this.maxDataPoints) {
+                            this.chartData.labels.shift();
+                            this.chartData.heartRate.shift();
+                            this.chartData.spo2.shift();
+                            this.chartData.temperature.shift();
+                        }
+                        Object.keys(this.charts).forEach(key => {
+                            if (this.charts[key]) {
+                                this.charts[key].data.labels = [...this.chartData.labels];
+                                const dataRef = key === 'hrChart' ? 'heartRate' : (key === 'spo2Chart' ? 'spo2' :
+                                    'temperature');
+                                this.charts[key].data.datasets[0].data = [...this.chartData[dataRef]];
+                                this.charts[key].update('none');
+                            }
+                        });
+                        if (sensor.status === 'warning' || sensor.status === 'critical') {
+                            this.notificationSound.play().catch(() => {});
+                        }
+                    },
+
+                    scrollToBottom() {
+                        this.$nextTick(() => {
+                            if (this.$refs.chatBox) this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
+                        });
+                    },
+                    resetCharts() {
+                        Object.values(this.charts).forEach(c => c?.destroy());
+                        this.charts = {
+                            hrChart: null,
+                            spo2Chart: null,
+                            tempChart: null
+                        };
+                    },
+                    logout() {
+                        localStorage.removeItem('monitoringApiKey');
+                        localStorage.removeItem('selectedMonitoringDevice');
+                        window.location.reload();
+                    },
+                    getStatusClass(v, t) {
+                        if (!v) return 'text-gray-400';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'spo2') return (v < 95) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'text-orange-500' : 'text-green-500';
+                    },
+                    getStatusText(v, t) {
+                        if (!v) return '—';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'Abnormal' : 'Normal';
+                        if (t === 'spo2') return (v < 95) ? 'Rendah' : 'Normal';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'Abnormal' : 'Normal';
+                    },
+                    getKondisiClass(s) {
+                        if (s === 'normal') return 'text-[rgb(0,62,48)]';
+                        if (s === 'warning') return 'text-orange-500';
+                        return s === 'critical' ? 'text-red-500' : 'text-gray-400';
+                    },
+                    statusLabel(s) {
+                        if (!s) return '—';
+                        return s.charAt(0).toUpperCase() + s.slice(1);
                     }
-                }
+                };
             }
         </script>
     @endpush

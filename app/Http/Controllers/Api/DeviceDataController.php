@@ -82,9 +82,14 @@ class DeviceDataController extends Controller
         }
 
         $limit = request('limit', 100);
-        $devices = Devices::select('device_id', 'status', 'last_seen')
-            ->limit($limit)
-            ->get();
+        $query = Devices::select('device_id', 'status', 'last_seen');
+
+        // Filter by device associated with the matched API key
+        if (isset($matchedKey)) {
+            $query->where('device_id', $matchedKey->device_id);
+        }
+
+        $devices = $query->limit($limit)->get();
 
         return response()->json([
             'success' => true,

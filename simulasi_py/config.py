@@ -4,8 +4,8 @@
 BASE_URL = "http://localhost:8000/api"
 
 # Ganti dengan data dari dashboard superadmin setelah tambah alat
-DEVICE_ID = "Device_01"
-API_KEY = "sats_L1Ag1U8idzSgPJ8W3MeEc7DI0ZcJmEum"
+DEVICE_ID = "Device_02"
+API_KEY = "sats_hRmOgQ0d0lFE2HbyQLXASWPdcXKBvdQ3"
 
 # Interval pengiriman data (detik)
 SEND_INTERVAL = 1
