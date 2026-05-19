@@ -58,6 +58,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/monitoring', function () {
             return view('pages.dokter.monitoring');
         })->name('dokter.monitoring');
+
+        Route::get('/monitoring-3d', function () {
+            return view('pages.dokter.monitor-3d');
+        })->name('dokter.monitoring-3d');
     });
 
     // Superadmin Routes
