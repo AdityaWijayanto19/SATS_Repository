@@ -2,6 +2,10 @@
 
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\AuthenticateApiKey;
+use App\Http\Middleware\ThrottleApiRequests;
+use App\Http\Middleware\IdempotentRequest;
+use App\Http\Middleware\ValidateRequestSignature;
+use App\Http\Middleware\AuthenticateMonitoringAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'apikey' => AuthenticateApiKey::class,
+            'throttle.api' => ThrottleApiRequests::class,
+            'idempotent' => IdempotentRequest::class,
+            'sign.verify' => ValidateRequestSignature::class,
+            'monitoring.auth' => AuthenticateMonitoringAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

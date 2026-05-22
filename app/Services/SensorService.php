@@ -16,12 +16,16 @@ class SensorService
 
     public function __construct()
     {
-        $this->cache = Cache::store('file');
+        $this->cache = Cache::store('redis');
     }
 
+    /**
+     * Store single sensor reading (DB only — no broadcast)
+     */
     public function storeSensorData(array $data): SensorData
     {
         Log::info('Service: mulai store sensor data', $data);
+
         // Update last_seen saja (status diatur oleh nakes via dashboard)
         Devices::where('device_id', $data['device_id'])
             ->update([
@@ -35,7 +39,6 @@ class SensorService
             'id' => $sensorData->id
         ]);
 
-        // Clear cache untuk latest data device ini
         $this->clearLatestDataCache($data['device_id']);
 
         // Broadcast data baru ke semua dashboard yang terhubung
@@ -53,6 +56,43 @@ class SensorService
         $this->triggerPredictionIfNeeded($data['device_id']);
 
         return $sensorData;
+    }
+
+    /**
+     * Store batch sensor readings efficiently (DB only — no broadcast)
+     */
+    public function storeSensorDataBatch(array $readings): int
+    {
+        if (empty($readings)) {
+            return 0;
+        }
+
+        Log::info('Service: mulai store batch sensor data', [
+            'count' => count($readings),
+            'device_id' => $readings[0]['device_id'] ?? null,
+        ]);
+
+        $deviceId = $readings[0]['device_id'] ?? null;
+
+        // Bulk update device status once
+        Devices::where('device_id', $deviceId)
+            ->update([
+                'status' => 'online',
+                'last_seen' => Carbon::now(),
+            ]);
+
+        // Bulk insert all readings in single query
+        $inserted = SensorData::insert($readings);
+
+        Log::info('Service: batch data berhasil disimpan', [
+            'count' => count($readings),
+            'device_id' => $deviceId,
+        ]);
+
+        // Clear cache untuk latest data
+        $this->clearLatestDataCache($deviceId);
+
+        return $inserted ? count($readings) : 0;
     }
 
     /**

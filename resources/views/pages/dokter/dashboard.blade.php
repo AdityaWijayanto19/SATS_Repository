@@ -14,7 +14,7 @@
             <div class="relative">
                 <button @click="dropdownOpen = !dropdownOpen"
                     class="cursor-pointer px-4 py-2 bg-[rgb(0,62,48)] text-white rounded-lg flex items-center gap-2 text-sm hover:opacity-90 transition">
-                    Pilih Perangkat
+                    <span x-text="selectedDeviceId || 'Pilih Perangkat'"></span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -25,7 +25,8 @@
                     class="absolute right-0 mt-2 w-52 bg-white border border-[rgba(0,83,63,0.15)] rounded-xl shadow-sm z-50 overflow-hidden">
                     <template x-for="device in allDevices" :key="device.device_id">
                         <div @click="selectDevice(device.device_id); dropdownOpen = false"
-                            class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer text-[rgb(0,62,48)]"
+                            class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer"
+                            :class="device.device_id === selectedDeviceId ? 'text-[rgb(0,62,48)] font-bold bg-green-50' : 'text-[rgb(0,62,48)]'"
                             x-text="device.device_id"></div>
                     </template>
                     <div x-show="allDevices.length === 0" class="px-4 py-3 text-sm text-gray-400 text-center">
@@ -59,8 +60,7 @@
                     <span x-text="latest?.heart_rate ?? '—'"></span>
                     <span class="text-sm font-normal text-red-400">bpm</span>
                 </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.heart_rate, 'hr')"
-                    x-text="getStatusText(latest?.heart_rate, 'hr')"></p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.heart_rate, 'hr')" x-text="getStatusText(latest?.heart_rate, 'hr')"></p>
             </div>
 
             {{-- SpO2 --}}
@@ -70,8 +70,7 @@
                     <span x-text="latest?.spo2 ?? '—'"></span>
                     <span class="text-sm font-normal text-blue-400">%</span>
                 </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.spo2, 'spo2')"
-                    x-text="getStatusText(latest?.spo2, 'spo2')"></p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.spo2, 'spo2')" x-text="getStatusText(latest?.spo2, 'spo2')"></p>
             </div>
 
             {{-- Temperature --}}
@@ -81,23 +80,15 @@
                     <span x-text="latest?.temperature ?? '—'"></span>
                     <span class="text-sm font-normal text-orange-400">°C</span>
                 </p>
-                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.temperature, 'temp')"
-                    x-text="getStatusText(latest?.temperature, 'temp')"></p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.temperature, 'temp')" x-text="getStatusText(latest?.temperature, 'temp')"></p>
             </div>
 
             {{-- Kondisi Pasien --}}
             <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
                 <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
-                <p class="text-2xl font-medium"
-                    :class="{
-                        'text-[rgb(0,62,48)]': latest?.status === 'normal',
-                        'text-orange-500': latest?.status === 'warning',
-                        'text-red-500': latest?.status === 'critical'
-                    }"
-                    x-text="latest?.status ? latest.status.charAt(0).toUpperCase() + latest.status.slice(1) : '—'"></p>
-                <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">
-                    Pembaruan: <span x-text="latest?.created_at ?? '—'"></span>
-                </p>
+                <p class="text-2xl font-medium" :class="{'text-[rgb(0,62,48)]': latest?.status === 'normal', 'text-orange-500': latest?.status === 'warning', 'text-red-500': latest?.status === 'critical'}"
+                    x-text="latest?.status ? (latest.status.charAt(0).toUpperCase() + latest.status.slice(1)) : '—'"></p>
+                <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">Update: <span x-text="formatTime(latest?.created_at) || '—'"></span></p>
             </div>
         </div>
 
@@ -174,27 +165,25 @@
                     <p class="text-sm font-medium text-[rgb(0,62,48)]">Heart Rate</p>
                     <p class="text-[11px] text-gray-400 mt-0.5">bpm — 10 menit terakhir</p>
                 </div>
-                <div class="p-4 relative" style="height: 200px;">
+                <div class="p-4 relative" style="height:200px;">
                     <canvas id="hrChart"></canvas>
                 </div>
             </div>
-
             <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
                 <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
                     <p class="text-sm font-medium text-[rgb(0,62,48)]">SpO2</p>
                     <p class="text-[11px] text-gray-400 mt-0.5">% — 10 menit terakhir</p>
                 </div>
-                <div class="p-4 relative" style="height: 200px;">
+                <div class="p-4 relative" style="height:200px;">
                     <canvas id="spo2Chart"></canvas>
                 </div>
             </div>
-
             <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
                 <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
                     <p class="text-sm font-medium text-[rgb(0,62,48)]">Temperature</p>
                     <p class="text-[11px] text-gray-400 mt-0.5">°C — 10 menit terakhir</p>
                 </div>
-                <div class="p-4 relative" style="height: 200px;">
+                <div class="p-4 relative" style="height:200px;">
                     <canvas id="tempChart"></canvas>
                 </div>
             </div>
@@ -297,7 +286,7 @@
                 <div class="px-5 py-3.5 border-t border-[rgba(0,83,63,0.08)] bg-gray-50/50">
                     <div class="flex gap-3">
                         <textarea x-model="teksBaru" rows="1" @input="autoResize($el)" placeholder="Ctrl + Enter untuk kirim"
-                            class="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all"
+                            class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                             @keydown.ctrl.enter="kirimInstruksi()"></textarea>
                         <button @click="kirimInstruksi()" :disabled="!teksBaru.trim() || isSending"
                             class="self-end p-2.5 bg-[rgb(0,83,63)] text-white rounded-xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
@@ -374,7 +363,7 @@
             function dashboard() {
                 return {
                     allDevices: [],
-                    selectedDeviceId: null,
+                    selectedDeviceId: localStorage.getItem('selectedMonitoringDeviceDoc') || null,
                     dropdownOpen: false,
                     latest: null,
 
@@ -382,6 +371,14 @@
                         initCharts();
                         await this.fetchDevices();
                         this.setupRealtime();
+                    },
+
+                    formatTime(dateString) {
+                        if (!dateString) return '';
+                        let date = new Date(dateString);
+                        if (isNaN(date.getTime())) date = new Date(dateString.replace(" ", "T"));
+                        if (isNaN(date.getTime())) return dateString.match(/\d{2}:\d{2}/)?.[0] || dateString;
+                        return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
                     },
 
                     async fetchDevices() {
@@ -460,6 +457,20 @@
                             updateCharts(selected.history);
                         }
                         window.dispatchEvent(new CustomEvent('deviceSelected', { detail: { deviceId } }));
+                    },
+
+                    getStatusClass(v, t) {
+                        if (!v) return 'text-gray-400';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'spo2') return (v < 95) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'text-orange-500' : 'text-green-500';
+                    },
+
+                    getStatusText(v, t) {
+                        if (!v) return '—';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'Abnormal' : 'Normal';
+                        if (t === 'spo2') return (v < 95) ? 'Rendah' : 'Normal';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'Abnormal' : 'Normal';
                     },
 
                     destroy() {}

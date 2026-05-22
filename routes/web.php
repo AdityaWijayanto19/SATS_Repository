@@ -41,6 +41,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/instruksi', function () {
             return view('pages.nakes.instruksi');
         })->name('nakes.instruksi');
+
+        Route::get('/monitoring', function () {
+            return view('pages.nakes.monitoring');
+        })->name('nakes.monitoring');
     });
 
     // Dokter Routes
@@ -53,6 +57,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/instruksi', function () {
             return view('pages.dokter.instruksi');
         })->name('dokter.instruksi');
+
+        Route::get('/monitoring', function () {
+            return view('pages.dokter.monitoring');
+        })->name('dokter.monitoring');
+
+        Route::get('/monitoring-3d', function () {
+            return view('pages.dokter.monitor-3d');
+        })->name('dokter.monitoring-3d');
     });
 
     // Superadmin Routes
