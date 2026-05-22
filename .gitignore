@@ -25,3 +25,5 @@ yarn-error.log
 /.zed
 simulasi_py/devices.json
 .claude/
+dump.rdb
+redis_server/

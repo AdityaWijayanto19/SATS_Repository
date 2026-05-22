@@ -54,7 +54,7 @@ class SensorDataController extends Controller
         // 1. IMMEDIATE real-time broadcast via WebSocket (near-zero latency)
         //    Uses a dry model instance so the event fires NOW, not after DB write.
         $dryModel = $this->buildDryModel($data);
-        SensorDataReceived::dispatch($dryModel);
+        SensorDataReceived::dispatch($deviceId, $dryModel);
 
         // 2. Dispatch background DB write job (non-blocking)
         ProcessSensorData::dispatch($data);
@@ -95,7 +95,7 @@ class SensorDataController extends Controller
         // 1. IMMEDIATE real-time broadcast for each reading
         foreach ($readings as $reading) {
             $dryModel = $this->buildDryModel($reading);
-            SensorDataReceived::dispatch($dryModel);
+            SensorDataReceived::dispatch($deviceId, $dryModel);
         }
 
         // 2. Dispatch single background DB job for batch processing

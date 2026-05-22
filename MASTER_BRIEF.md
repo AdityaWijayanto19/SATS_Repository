@@ -85,15 +85,19 @@
 - Identik dengan dashboard nakes (monitoring, chart, vital sign)
 - **Terhubung ke API real (instruction, sensor-data)**
 
-### 3b. Halaman Instruksi [TERHUBUNG KE API]
+### 3b. Floating Chat Widget [TERHUBUNG KE API]
 
-- Halaman instruksi terpisah untuk nakes dan dokter (`/nakes/instruksi`, `/dokter/instruksi`)
-- **Nakes:** Kirim laporan kejadian, konfirmasi instruksi dokter (dropdown 5 opsi + checklist)
-- **Dokter:** Pantau laporan nakes, kirim instruksi medis (textarea + tombol kirim)
-- Realtime chat-style layout dengan scroll otomatis
-- State checklist nakes di-preserve saat polling
-- **Backend:** `InstructionController`, `InstructionService`, 3 Events, 4 Form Requests
+- Widget chat floating di pojok kanan bawah (fixed position) pada dashboard nakes & dokter
+- **Minimized:** Tombol hijau rounded dengan ikon chat bubbles + notifikasi merah saat ada pesan baru
+- **Expanded:** Panel chat dengan header (logo SATS, status online, sapaan role), area pesan, input, footer
+- **Nakes:** Kirim pesan/laporan (free text) + 9 quick reply buttons (Sudah dilakukan, Dalam proses, Alat tidak tersedia, Obat sudah diberikan, Pasien stabil, Pasien kritis, Butuh bantuan, Gagal, Monitoring lanjutan)
+- **Dokter:** Kirim instruksi medis (free text), pantau laporan & respon nakes
+- Real-time via Laravel Reverb WebSocket (zero delay)
+- Echo channel cleanup saat ganti device
+- **Component:** `resources/views/components/chat-widget.blade.php` (Alpine.js `chatWidget()`)
+- **Backend:** `InstructionController`, `InstructionService`, 3 Events (`ShouldBroadcastNow`), 4 Form Requests
 - **Tabel:** `instructions` (device_id, dokter_id, nakes_id, instruksi_dokter, respon_nakes, laporan_nakes, is_completed)
+- **Bug fixes:** Duplikasi pesan (Reverb + API response), `toOthers()` removed, nested `template x-if` → `x-show`, device subscription untuk offline devices
 
 ### 4. Input Data Pasien [UI SELESAI, BELUM ADA BACKEND]
 

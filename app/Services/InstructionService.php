@@ -43,7 +43,7 @@ class InstructionService
 
         $formatted = $this->formatSingleInstruction($instruction);
         try {
-            broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+            broadcast(new InstructionSent($instruction->load('dokter:id,name')));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionSent failed: ' . $e->getMessage());
         }
@@ -68,7 +68,7 @@ class InstructionService
 
         // Broadcast ke dokter bahwa tugas sudah selesai
         try {
-            broadcast(new InstructionStatusUpdated($instruction->load('nakes:id,name')))->toOthers();
+            broadcast(new InstructionStatusUpdated($instruction->load('nakes:id,name')));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionStatusUpdated failed: ' . $e->getMessage());
         }
@@ -86,7 +86,7 @@ class InstructionService
 
         // Broadcast ke nakes bahwa ada instruksi baru
         try {
-            broadcast(new InstructionSent($instruction->load('dokter:id,name')))->toOthers();
+            broadcast(new InstructionSent($instruction->load('dokter:id,name')));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionSent failed: ' . $e->getMessage());
         }
@@ -107,7 +107,7 @@ class InstructionService
         // Broadcast ke dokter bahwa ada laporan baru
         $formatted = $this->formatSingleInstruction($instruction);
         try {
-            broadcast(new InstructionReportSubmitted($instruction->load('nakes:id,name')))->toOthers();
+            broadcast(new InstructionReportSubmitted($instruction->load('nakes:id,name')));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionReportSubmitted failed: ' . $e->getMessage());
         }
