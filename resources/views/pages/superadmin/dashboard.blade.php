@@ -201,6 +201,9 @@
 
 @push('scripts')
 <script>
+// Global reference — always points to the LATEST Alpine proxy
+window._superadminRef = null;
+
 function superadminDashboard() {
     return {
         // Reactive counts for stat cards
@@ -218,16 +221,27 @@ function superadminDashboard() {
         activityLogs: @json($activityLogs ?? []),
 
         init() {
-            this.subscribeToGlobalChannel();
+            // Always update global ref to the LATEST proxy
+            window._superadminRef = this;
+
+            // Only subscribe Echo once
+            if (!window._superadminEchoBound) {
+                window._superadminEchoBound = true;
+                this.subscribeToGlobalChannel();
+            }
+
             this.subscribeToAllDevices();
             this.pollOnlineUsers();
             setInterval(() => this.pollOnlineUsers(), 5000);
         },
 
         subscribeToGlobalChannel() {
-            window.Echo.channel('superadmin.dashboard')
-                .listen('.activity.log.created', (e) => {
-                    this.activityLogs.unshift({
+            const channel = window.Echo.private('superadmin.dashboard');
+
+            channel.listen('.activity.log.created', (e) => {
+                    const ref = window._superadminRef;
+                    if (!ref) return;
+                    ref.activityLogs = [{
                         id: e.id,
                         type: e.type,
                         message: e.message,
@@ -236,34 +250,30 @@ function superadminDashboard() {
                         user_role: e.user_role,
                         device_id: e.device_id,
                         created_at: e.created_at,
-                    });
-                    if (this.activityLogs.length > 50) {
-                        this.activityLogs = this.activityLogs.slice(0, 50);
-                    }
-                });
-
-            window.Echo.private('superadmin.dashboard')
+                    }, ...ref.activityLogs.slice(0, 49)];
+                })
                 .listen('.device.status.changed.global', (e) => {
+                    const ref = window._superadminRef;
+                    if (!ref) return;
                     if (e.status === 'online' && e.device_data) {
-                        const exists = this.activeDevices.find(d => d.device_id === e.device_id);
+                        const exists = ref.activeDevices.find(d => d.device_id === e.device_id);
                         if (!exists) {
-                            this.activeDevices.push(e.device_data);
-                            this.activeDeviceCount++;
-                            this.inactiveDeviceCount--;
+                            ref.activeDevices = [...ref.activeDevices, e.device_data];
+                            ref.activeDeviceCount++;
+                            ref.inactiveDeviceCount--;
                             this.subscribeToDevice(e.device_id);
                         } else {
-                            const index = this.activeDevices.findIndex(d => d.device_id === e.device_id);
-                            this.activeDevices[index] = {
-                                ...this.activeDevices[index],
-                                ...e.device_data,
-                            };
+                            const updated = [...ref.activeDevices];
+                            const index = updated.findIndex(d => d.device_id === e.device_id);
+                            updated[index] = { ...updated[index], ...e.device_data };
+                            ref.activeDevices = updated;
                         }
                     } else if (e.status === 'offline') {
-                        const wasActive = this.activeDevices.find(d => d.device_id === e.device_id);
+                        const wasActive = ref.activeDevices.find(d => d.device_id === e.device_id);
                         if (wasActive) {
-                            this.activeDevices = this.activeDevices.filter(d => d.device_id !== e.device_id);
-                            this.activeDeviceCount--;
-                            this.inactiveDeviceCount++;
+                            ref.activeDevices = ref.activeDevices.filter(d => d.device_id !== e.device_id);
+                            ref.activeDeviceCount--;
+                            ref.inactiveDeviceCount++;
                             this.unsubscribeDevice(e.device_id);
                         }
                     }

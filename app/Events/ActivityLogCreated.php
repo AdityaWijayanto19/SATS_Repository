@@ -3,7 +3,7 @@
 namespace App\Events;
 
 use App\Models\ActivityLog;
-use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -19,7 +19,7 @@ class ActivityLogCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new Channel('superadmin.dashboard')];
+        return [new PrivateChannel('superadmin.dashboard')];
     }
 
     public function broadcastAs(): string

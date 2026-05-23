@@ -120,7 +120,7 @@ resources/views/
 - [x] Fitur instruksi dokter→nakes (terhubung ke API InstructionController)
 - [x] Fitur laporan nakes→dokter (submit laporan kejadian)
 - [x] Fitur respon nakes (dropdown 5 opsi respon + checklist instruksi)
-- [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas)
+- [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas realtime)
 - [x] Sidebar dinamis (nakes/dokter/superadmin)
 - [x] Navbar menampilkan nama + role user
 - [x] Manajemen alat (CRUD terhubung ke backend, auto-generate API key)
@@ -194,3 +194,6 @@ resources/views/
 - Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware
 - `updateCharts()` di kedua dashboard menerima data langsung (bukan fetch terpisah)
 - `toggleDevice()` pakai optimistic update (langsung berubah, revert kalau gagal)
+- Superadmin activity log realtime via WebSocket (PrivateChannel `superadmin.dashboard`)
+- Alpine.js double-init issue: CDN `collapse` plugin + main Alpine bikin `init()` dipanggil 2x
+- Fix: `window._superadminRef` global reference + `window._superadminEchoBound` guard
