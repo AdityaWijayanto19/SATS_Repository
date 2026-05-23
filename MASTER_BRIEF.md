@@ -223,7 +223,7 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 
 **API:** `GET /api/device/{device_id}/prediction`
 **Service:** `PatientMonitoringService.php` (Hugging Face Spaces)
-**Docs:** [API_INTEGRATION.md](API_INTEGRATION.md)
+**Docs:** [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 
 ---
 
@@ -583,6 +583,9 @@ Rekam medis ter-generate otomatis
 
 ## Dokumentasi Terkait
 
+- [README.md](README.md) - Gambaran umum project dan panduan setup
+- [DEMO.md](DEMO.md) - Panduan instalasi, menjalankan sistem, dan demo
+- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Dokumentasi API + integrasi ML Hugging Face
 - [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
 - [BACKEND.md](BACKEND.md) - Detail progress backend, API endpoints, service layer, dan simulator
 - [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
