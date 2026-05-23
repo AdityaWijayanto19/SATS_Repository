@@ -1,36 +1,42 @@
 """
 Simulasi Perangkat SATS (Smart Ambulance Telemedicine System)
 
-Script ini mensimulasikan alur perangkat IoT:
-1. Autentikasi dengan API key
-2. Kirim status sistem (battery, signal)
-3. Kirim data sensor secara berkala (heart rate, SpO2, temperature)
+Script ini mensimulasikan beberapa perangkat IoT secara paralel:
+1. Baca konfigurasi dari devices.json
+2. Setiap device: autentikasi, cek status, kirim data sensor
+3. Device harus online (diaktifkan nakes dari dashboard) sebelum kirim data
 4. Berhenti saat dihentikan (Ctrl+C)
 
 Usage:
     python simulator.py
-    python simulator.py --device DEVICE_01 --key your_api_key_here
+    python simulator.py --url http://localhost:8000/api
 """
 
-import argparse
 import json
 import random
+import secrets
 import signal
 import sys
+import threading
 import time
 from datetime import datetime
 
 import requests
 
-from config import BASE_URL, DEVICE_ID, API_KEY, SEND_INTERVAL, SENSOR_CONFIG, THRESHOLDS
+# Interval cek status oleh monitor thread (detik)
+STATUS_CHECK_INTERVAL = 1
+
+from config import BASE_URL, DEFAULT_INTERVAL, SENSOR_CONFIG, THRESHOLDS, PROFILES, DEVICES_FILE
 
 
 class SATSSimulator:
-    def __init__(self, device_id: str, api_key: str):
+    def __init__(self, device_id: str, api_key: str, profile: str = "normal", interval: int = DEFAULT_INTERVAL):
         self.device_id = device_id
         self.api_key = api_key
+        self.profile = profile
+        self.interval = interval
         self.base_url = BASE_URL
-        self.running = False
+        self.stop_event = threading.Event()
         self.data_count = 0
 
         self.headers = {
@@ -41,11 +47,10 @@ class SATSSimulator:
 
     def log(self, message: str, level: str = "INFO"):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] [{level}] {message}")
+        print(f"[{timestamp}] [{self.device_id}] [{level}] {message}")
 
     def authenticate(self) -> bool:
-        """Autentikasi perangkat dengan API key"""
-        self.log(f"Mengautentikasi perangkat {self.device_id}...")
+        self.log(f"Mengautentikasi...")
         try:
             url = f"{self.base_url}/device/{self.device_id}/authenticate"
             response = requests.post(url, headers=self.headers, json={
@@ -59,153 +64,249 @@ class SATSSimulator:
                 self.log(f"Autentikasi gagal: {response.status_code} - {response.text}", "ERROR")
                 return False
         except requests.ConnectionError:
-            self.log("Tidak dapat terhubung ke server. Pastikan Laravel berjalan.", "ERROR")
+            self.log("Tidak dapat terhubung ke server.", "ERROR")
             return False
 
+    def check_status(self) -> str:
+        """Cek status perangkat (online/offline) dari server"""
+        try:
+            url = f"{self.base_url}/device/{self.device_id}/status"
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", {}).get("status", "offline")
+        except Exception:
+            pass
+        return "offline"
+
+    def wait_for_online(self):
+        """Tunggu sampai nakes mengaktifkan perangkat dari dashboard"""
+        self.log("Perangkat offline. Menunggu nakes mengaktifkan...", "WARN")
+        while True:
+            time.sleep(3)
+            status = self.check_status()
+            if status == "online":
+                self.log("Perangkat diaktifkan oleh nakes!", "SUCCESS")
+                return
+
     def send_system_status(self) -> bool:
-        """Kirim status sistem (battery, signal)"""
         battery = random.randint(60, 100)
         signal_strength = random.randint(50, 100)
 
-        self.log(f"Mengirim status sistem: battery={battery}%, signal={signal_strength}%")
         try:
             url = f"{self.base_url}/device/{self.device_id}/system-status"
-            response = requests.post(url, headers=self.headers, json={
+            headers = {**self.headers, "Idempotency-Key": self.generate_idempotency_key()}
+            response = requests.post(url, headers=headers, json={
                 "monitoring_status": "active",
                 "battery_level": battery,
                 "signal_strength": signal_strength,
             })
 
-            if response.status_code == 201:
-                self.log("Status sistem terkirim", "SUCCESS")
+            if response.status_code in (200, 201, 202):
+                self.log(f"Status sistem: battery={battery}%, signal={signal_strength}%", "SUCCESS")
                 return True
             else:
-                self.log(f"Gagal kirim status: {response.status_code}", "ERROR")
+                self.log(f"Gagal kirim status: {response.status_code} - {response.text}", "ERROR")
                 return False
         except Exception as e:
             self.log(f"Error: {e}", "ERROR")
             return False
 
     def generate_sensor_data(self) -> dict:
-        """Generate data sensor realistis"""
         cfg = SENSOR_CONFIG
+        prob_normal, prob_warning, prob_critical = PROFILES.get(self.profile, PROFILES["normal"])
 
-        # 90% normal, 7% warning, 3% critical
         roll = random.random()
-        if roll < 0.90:
-            # Normal
+        if roll < prob_normal:
             heart_rate = random.randint(cfg["heart_rate"]["min"], cfg["heart_rate"]["max"])
-            spo2 = random.randint(cfg["spo2"]["min"], cfg["spo2"]["max"])
             temperature = round(random.uniform(cfg["temperature"]["min"], cfg["temperature"]["max"]), 1)
+            spo2 = random.randint(cfg["spo2"]["min"], cfg["spo2"]["max"])
             status = "normal"
-        elif roll < 0.97:
-            # Warning
+        elif roll < prob_normal + prob_warning:
             heart_rate = random.choice([
                 random.randint(45, THRESHOLDS["heart_rate"]["warning_low"]),
                 random.randint(THRESHOLDS["heart_rate"]["warning_high"], THRESHOLDS["heart_rate"]["critical_high"]),
             ])
-            spo2 = random.randint(THRESHOLDS["spo2"]["critical_low"], THRESHOLDS["spo2"]["warning_low"])
             temperature = round(random.uniform(THRESHOLDS["temperature"]["warning_high"], THRESHOLDS["temperature"]["critical_high"]), 1)
+            spo2 = random.randint(THRESHOLDS["spo2"]["critical_low"], THRESHOLDS["spo2"]["warning_low"])
             status = "warning"
         else:
-            # Critical
             heart_rate = random.choice([
                 random.randint(30, THRESHOLDS["heart_rate"]["critical_low"]),
                 random.randint(THRESHOLDS["heart_rate"]["critical_high"], 180),
             ])
-            spo2 = random.randint(70, THRESHOLDS["spo2"]["critical_low"] - 1)
             temperature = round(random.uniform(THRESHOLDS["temperature"]["critical_high"], 41.0), 1)
+            spo2 = random.randint(70, THRESHOLDS["spo2"]["critical_low"] - 1)
             status = "critical"
 
         return {
             "heart_rate": heart_rate,
-            "spo2": spo2,
             "temperature": temperature,
+            "spo2": spo2,
             "status": status,
         }
 
+    def generate_idempotency_key(self) -> str:
+        """Generate unique idempotency key (32 hex chars)"""
+        return secrets.token_hex(16)
+
     def send_sensor_data(self) -> bool:
-        """Kirim data sensor ke server"""
         data = self.generate_sensor_data()
         self.data_count += 1
 
         self.log(
             f"[#{self.data_count}] HR={data['heart_rate']}bpm | "
-            f"SpO2={data['spo2']}% | Temp={data['temperature']}C | "
+            f"Temp={data['temperature']}C | SpO2={data['spo2']}% | "
             f"Status={data['status'].upper()}"
         )
 
         try:
             url = f"{self.base_url}/device/{self.device_id}/sensor-data"
-            response = requests.post(url, headers=self.headers, json=data)
+            headers = {**self.headers, "Idempotency-Key": self.generate_idempotency_key()}
+            response = requests.post(url, headers=headers, json=data)
 
-            if response.status_code == 201:
+            if response.status_code in (200, 201, 202):
                 return True
             elif response.status_code == 401:
-                self.log("API key tidak valid atau expired!", "ERROR")
-                self.running = False
+                self.log("API key tidak valid!", "ERROR")
+                self.stop_event.set()
                 return False
             else:
-                self.log(f"Gagal kirim data: {response.status_code} - {response.text}", "ERROR")
+                self.log(f"Gagal kirim data: {response.status_code}", "ERROR")
                 return False
         except Exception as e:
             self.log(f"Error: {e}", "ERROR")
             return False
 
+    def _status_monitor(self):
+        """Thread terpisah: cek status setiap detik, hentikan jika offline"""
+        while not self.stop_event.is_set():
+            self.stop_event.wait(STATUS_CHECK_INTERVAL)
+            if self.stop_event.is_set():
+                break
+            status = self.check_status()
+            if status != "online":
+                self.log("Perangkat dimatikan oleh nakes.", "WARN")
+                self.stop_event.set()
+                return
+
     def run(self):
-        """Jalankan simulasi utama"""
-        print("=" * 60)
-        print("  SIMULASI PERANGKAT SATS")
-        print(f"  Device: {self.device_id}")
-        print(f"  Server: {self.base_url}")
-        print(f"  Interval: {SEND_INTERVAL}s")
-        print("=" * 60)
-        print()
+        print(f"  [{self.device_id}] Profile: {self.profile} | Interval: {self.interval}s")
 
         # Step 1: Autentikasi
         if not self.authenticate():
-            print("\nGagal autentikasi. Pastikan:")
-            print(f"  1. Device '{self.device_id}' terdaftar di dashboard superadmin")
-            print(f"  2. API key benar")
-            print(f"  3. Server Laravel berjalan di {self.base_url}")
-            sys.exit(1)
+            self.log("Gagal autentikasi. Lewati device ini.", "ERROR")
+            return
 
-        # Step 2: Kirim status sistem
+        # Step 2: Tunggu sampai online
+        status = self.check_status()
+        if status != "online":
+            self.wait_for_online()
+
+        # Step 3: Kirim status sistem
         self.send_system_status()
 
-        # Step 3: Loop kirim data sensor
-        self.running = True
-        print()
-        self.log(f"Mengirim data setiap {SEND_INTERVAL} detik... (Ctrl+C untuk berhenti)")
-        print("-" * 60)
+        # Step 4: Loop kirim data sensor dengan monitor thread
+        self.stop_event.clear()
+        self.log(f"Mengirim data setiap {self.interval}s...")
 
         try:
-            while self.running:
-                self.send_sensor_data()
-                time.sleep(SEND_INTERVAL)
-        except KeyboardInterrupt:
-            print()
-            self.log("Simulasi dihentikan oleh user", "WARN")
-            self.log(f"Total data terkirim: {self.data_count}")
+            while not self.stop_event.is_set():
+                # Mulai monitor thread
+                monitor = threading.Thread(target=self._status_monitor, daemon=True)
+                monitor.start()
 
-        print()
-        print("=" * 60)
-        print("  Simulasi selesai.")
-        print("=" * 60)
+                # Kirim data selama device online
+                while not self.stop_event.is_set():
+                    self.send_sensor_data()
+                    # Tunggu interval, tapi langsung bangun jika stop_event di-set
+                    if self.stop_event.wait(self.interval):
+                        break
+
+                # Monitor detect offline — tunggu sampai online lagi
+                monitor.join(timeout=2)
+                self.wait_for_online()
+                self.send_system_status()
+                self.stop_event.clear()
+        except KeyboardInterrupt:
+            pass
+
+        self.log(f"Selesai. Total data terkirim: {self.data_count}")
+
+
+def load_devices() -> list:
+    try:
+        with open(DEVICES_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"ERROR: File {DEVICES_FILE} tidak ditemukan!")
+        print(f"Buat file {DEVICES_FILE} dengan format:")
+        print(json.dumps([{
+            "device_id": "DEV-01",
+            "api_key": "sats_xxxxxxxx",
+            "profile": "normal",
+            "interval": 2
+        }], indent=2))
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Format JSON salah di {DEVICES_FILE}: {e}")
+        sys.exit(1)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Simulasi Perangkat SATS")
-    parser.add_argument("--device", default=DEVICE_ID, help="Device ID")
-    parser.add_argument("--key", default=API_KEY, help="API Key")
-    parser.add_argument("--interval", type=int, default=SEND_INTERVAL, help="Interval pengiriman (detik)")
-    parser.add_argument("--url", default=BASE_URL, help="Base URL API")
+    devices = load_devices()
 
-    args = parser.parse_args()
+    if not devices:
+        print("Tidak ada device di devices.json")
+        sys.exit(1)
 
-    simulator = SATSSimulator(args.device, args.key)
-    simulator.base_url = args.url
-    simulator.run()
+    print("=" * 60)
+    print("  SIMULASI PERANGKAT SATS (MULTI-DEVICE)")
+    print(f"  Server: {BASE_URL}")
+    print(f"  Jumlah device: {len(devices)}")
+    print("=" * 60)
+    print()
+
+    threads = []
+    simulators = []
+
+    for dev in devices:
+        sim = SATSSimulator(
+            device_id=dev["device_id"],
+            api_key=dev["api_key"],
+            profile=dev.get("profile", "normal"),
+            interval=dev.get("interval", DEFAULT_INTERVAL),
+        )
+        simulators.append(sim)
+        t = threading.Thread(target=sim.run, daemon=True)
+        threads.append(t)
+
+    # Jalankan semua thread
+    for t in threads:
+        t.start()
+        time.sleep(0.5)  # Jeda antar start agar log tidak tumpang tindih
+
+    print()
+    print("-" * 60)
+    print("  Semua device berjalan. Tekan Ctrl+C untuk berhenti.")
+    print("-" * 60)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print()
+        print("=" * 60)
+        print("  Menghentikan semua simulasi...")
+        print("=" * 60)
+
+        for sim in simulators:
+            sim.stop_event.set()
+
+        for t in threads:
+            t.join(timeout=3)
+
+        print("  Semulasi selesai.")
 
 
 if __name__ == "__main__":

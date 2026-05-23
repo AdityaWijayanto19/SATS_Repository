@@ -34,8 +34,10 @@
 | **PDF**       | barryvdh/laravel-dompdf v3.1                   |
 | **Build**     | Vite v6                                        |
 | **Database**  | MySQL (`sats_db`)                              |
+| **WebSocket** | Laravel Reverb v1.0 (broadcasting)             |
+| **Queue**     | Redis (predis/predis v3.4) + Database driver   |
 | **IoT**       | Arduino IDE (kode terpisah, belum ada di repo)  |
-| **ML**        | Belum diimplementasikan (rencana di akhir)      |
+| **ML**        | Hugging Face Spaces (Gradio async 2-step API)   |
 
 ---
 
@@ -47,7 +49,7 @@
 | `dokter`     | `/dokter/*`             | Sudah ada view |
 | `superadmin` | `/superadmin/*`         | Sudah ada view |
 
-**Pembeda nakes & dokter:** Halaman identik, dipisah route & folder. Fitur tambahan dokter: container komentar untuk nakes. Fitur tambahan nakes: dropdown respon instruksi dokter.
+**Pembeda nakes & dokter:** Halaman dashboard identik, dipisah route & folder. Halaman instruksi terpisah: dokter kirim instruksi medis, nakes kirim laporan kejadian + konfirmasi instruksi.
 
 ### Akun Pengguna (Seeder)
 
@@ -74,19 +76,28 @@
 - Dropdown perangkat (polling `/api/devices` setiap 10 detik, auto-update tanpa refresh)
 - 4 kartu statistik: Heart Rate, SpO2, Suhu, Kondisi Pasien
 - Banner prediksi ML (dari database, fallback "Data prediksi belum tersedia")
+- Probability card: Membaik/Stabil/Memburuk % dengan progress bar
 - 3 grafik real-time Chart.js (polling setiap 5 detik, skip update jika data sama)
-- Container respon instruksi dokter (dropdown 5 opsi + checklist)
-- State checklist komentar tetap terjaga saat polling
-- **Terhubung ke API real (sensor-data/latest, sensor-data/history, comments)**
+- **Terhubung ke API real (sensor-data/latest, sensor-data/history, instruction)**
 
 ### 3. Dashboard Dokter [TERHUBUNG KE API]
 
 - Identik dengan dashboard nakes (monitoring, chart, vital sign)
-- Container komentar untuk nakes (textarea + kirim)
-- Daftar komentar terkirim dengan timestamp
-- Tampilan respon nakes (green border, label "Respon Nakes")
-- Polling komentar setiap 5 detik
-- **Terhubung ke API real (comments, sensor-data)**
+- **Terhubung ke API real (instruction, sensor-data)**
+
+### 3b. Floating Chat Widget [TERHUBUNG KE API]
+
+- Widget chat floating di pojok kanan bawah (fixed position) pada dashboard nakes & dokter
+- **Minimized:** Tombol hijau rounded dengan ikon chat bubbles + notifikasi merah saat ada pesan baru
+- **Expanded:** Panel chat dengan header (logo SATS, status online, sapaan role), area pesan, input, footer
+- **Nakes:** Kirim pesan/laporan (free text) + 9 quick reply buttons (Sudah dilakukan, Dalam proses, Alat tidak tersedia, Obat sudah diberikan, Pasien stabil, Pasien kritis, Butuh bantuan, Gagal, Monitoring lanjutan)
+- **Dokter:** Kirim instruksi medis (free text), pantau laporan & respon nakes
+- Real-time via Laravel Reverb WebSocket (zero delay)
+- Echo channel cleanup saat ganti device
+- **Component:** `resources/views/components/chat-widget.blade.php` (Alpine.js `chatWidget()`)
+- **Backend:** `InstructionController`, `InstructionService`, 3 Events (`ShouldBroadcastNow`), 4 Form Requests
+- **Tabel:** `instructions` (device_id, dokter_id, nakes_id, instruksi_dokter, respon_nakes, laporan_nakes, is_completed)
+- **Bug fixes:** Duplikasi pesan (Reverb + API response), `toOthers()` removed, nested `template x-if` → `x-show`, device subscription untuk offline devices
 
 ### 4. Input Data Pasien [UI SELESAI, BELUM ADA BACKEND]
 
@@ -143,23 +154,26 @@
 
 - Sidebar dinamis berdasarkan role:
   - **Superadmin:** Dashboard, Manajemen Alat, Manajemen User, Laporan
-  - **Dokter:** Dashboard, Input Data Pasien, Laporan
-  - **Nakes:** Dashboard, Input Data Pasien, Laporan
+  - **Dokter:** Dashboard, Input Data Pasien, Laporan, Instruksi
+  - **Nakes:** Dashboard, Input Data Pasien, Laporan, Instruksi
 - Active state menggunakan `request()->routeIs()`
 - Navbar: logo + nama user + role + tombol logout
 
 ### 11. Backend & Database [SEBAGIAN BESAR SELESAI]
 
 **Sudah ada:**
-- 12 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, commands, activity_log, comments, cache, jobs)
-- 10 model Eloquent dengan relasi lengkap
-- 3 service layer: AuthService, DeviceService, UserService
-- 7 form request validation
+- 11 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, activity_log, instructions, cache, jobs)
+- 9 model Eloquent dengan relasi: User, Devices, SensorData, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction
+- 5 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService
+- 11 form request validation
+- 3 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
+- 2 job class: ProcessDeviceData, ProcessSensorData
 - API sensor data (POST, GET latest, GET history)
-- API komentar (GET, POST, PATCH respond)
+- API instruksi (GET, POST, POST report, PATCH update, PATCH complete)
 - API device list (`/api/devices`)
 - API system status (POST, GET)
 - Autentikasi device via API key
+- Queue & broadcasting infrastructure (Redis + Reverb)
 - Seeder: 3 user + 2 device + 2 API key
 - Dokumentasi: [DATABASE.md](DATABASE.md), [BACKEND.md](BACKEND.md)
 
@@ -168,9 +182,7 @@
 - Route untuk UserController (CRUD user belum terhubung ke UI)
 - Laporan dari database (masih dummy data)
 - Device config dari database (masih hardcoded)
-- Commands controller (start/stop device)
 - Activity log controller
-- Integrasi ML
 
 ### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
 
@@ -188,13 +200,30 @@ Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware.
   - `GET /api/device/{device_id}/sensor-data/history?minutes=10`
   - `GET /api/device/{device_id}/system-status`
 
-### 13. Machine Learning [BELUM ADA]
+### 13. Machine Learning [SELESAI]
 
-Direncanakan ditambahkan di akhir project. Fitur:
-- Prediksi: "Pasien akan memburuk X% dalam Y menit ke depan"
-- Klasifikasi: Normal / Warning / Critical
-- Endpoint: `GET /api/device/{device_id}/prediction`
-- Response: `{ risk_level, risk_percent, timeframe_minutes, message }`
+Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-step API).
+
+**Alur:**
+1. Setiap 5 data sensor baru, `SensorService` trigger `PatientMonitoringService`
+2. Kirim 15 angka (5 menit × 3 vital signs: HR, Temp, SpO2) ke API eksternal
+3. Hasil disimpan di tabel `devices`: `ml_prediction`, `ml_condition`, `ml_risk_level`, `ml_probabilities`, `ml_predicted_at`
+4. Broadcast ulang ke dashboard via WebSocket setelah prediksi selesai
+
+**Output ML:**
+- Prediksi teks: "Pasien akan MEMBURUK (63%) dalam 5 menit ke depan"
+- Kondisi: `NORMAL` / `WARNING` / `CRITICAL`
+- Risk Level: `Low Risk` / `Medium Risk` / `High Risk`
+- Probabilitas: Membaik (%) / Stabil (%) / Memburuk (%)
+
+**Frontend:**
+- Banner prediksi ML di dashboard nakes & dokter
+- Probability card (3 kolom: Membaik, Stabil, Memburuk % dengan progress bar)
+- Data di-update real-time via WebSocket
+
+**API:** `GET /api/device/{device_id}/prediction`
+**Service:** `PatientMonitoringService.php` (Hugging Face Spaces)
+**Docs:** [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 
 ---
 
@@ -207,10 +236,10 @@ Direncanakan ditambahkan di akhir project. Fitur:
 - [ ] Pastikan data simulator langsung terlihat di dashboard tanpa delay signifikan
 
 ### Prioritas 2 — Notifikasi & Feedback UI
-- [ ] Notifikasi "Komentar terkirim" saat dokter mengirim komentar (toast/snackbar)
-- [ ] Warning/highlight saat komentar dichecklist nakes (badge atau animasi)
-- [ ] Badge counter komentar aktif di sidebar nakes
-- [ ] Notifikasi realtime saat ada komentar baru masuk
+- [ ] Notifikasi "Instruksi terkirim" saat dokter mengirim instruksi (toast/snackbar)
+- [ ] Warning/highlight saat instruksi diselesaikan nakes (badge atau animasi)
+- [ ] Badge counter instruksi aktif di sidebar nakes
+- [ ] Notifikasi realtime (broadcasting via Reverb sudah ada, perlu listener di frontend)
 
 ### Prioritas 3 — Backend yang Belum Selesai
 - [ ] Backend input data pasien (POST route + controller → tabel `patients`)
@@ -218,7 +247,6 @@ Direncanakan ditambahkan di akhir project. Fitur:
 - [ ] Aktifkan query database di LaporanController (ganti dummy data)
 - [ ] Aktifkan query database di SuperadminLaporanController (ganti dummy data)
 - [ ] Device config dari database (ganti hardcoded)
-- [ ] Commands controller (start/stop device)
 - [ ] Activity log: tulis log di setiap aksi penting
 
 ### Prioritas 4 — Integrasi & Testing
@@ -227,11 +255,12 @@ Direncanakan ditambahkan di akhir project. Fitur:
 - [ ] Stress testing API endpoint
 - [ ] Validasi data sensor (toleransi outlier)
 
-### Prioritas 5 — Machine Learning
-- [ ] Training model prediksi kondisi pasien
-- [ ] Integrasi model ke pipeline data
-- [ ] Endpoint prediksi
-- [ ] Tampilkan prediksi di dashboard dan laporan
+### Prioritas 5 — Machine Learning [SELESAI]
+- [x] Training model prediksi kondisi pasien (Hugging Face Spaces)
+- [x] Integrasi model ke pipeline data (PatientMonitoringService + SensorService)
+- [x] Endpoint prediksi (`GET /api/device/{id}/prediction`)
+- [x] Tampilkan prediksi di dashboard (banner + probability card)
+- [x] Probabilitas Membaik/Stabil/Memburuk di dashboard nakes & dokter
 
 ---
 
@@ -246,14 +275,25 @@ app/Http/Controllers/
   LaporanController.php           # Laporan HTML + PDF nakes/dokter (role-aware)
   SuperadminLaporanController.php # Laporan HTML + PDF superadmin
   Api/
-    DeviceAuthController.php      # Autentikasi device, sensor data, system status
-    SensorDataController.php      # Legacy sensor data endpoint
-    CommentController.php         # Komentar dokter-nakes
+    DeviceDataController.php      # Autentikasi device, system status, device config
+    SensorDataController.php      # Sensor data endpoint (store, latest, history)
+    InstructionController.php     # Instruksi dokter-nakes (CRUD + report + complete)
 
 app/Services/
   AuthService.php                 # Business logic autentikasi + redirect role
   DeviceService.php               # Sensor data CRUD + caching
   UserService.php                 # User CRUD
+  InstructionService.php          # Instruksi dokter-nakes business logic
+  SensorService.php               # Sensor data operations + caching
+
+app/Events/
+  InstructionSent.php             # Broadcast saat dokter kirim instruksi
+  InstructionStatusUpdated.php    # Broadcast saat nakes selesaikan instruksi
+  InstructionReportSubmitted.php  # Broadcast saat nakes submit laporan
+
+app/Jobs/
+  ProcessDeviceData.php           # Queue: proses system status device
+  ProcessSensorData.php           # Queue: proses sensor data
 
 app/Http/Middleware/
   RoleMiddleware.php              # Cek role user
@@ -267,9 +307,8 @@ app/Models/
   ApiKey.php                      # api_keys
   Patient.php                     # patients
   MedicalRecord.php               # medical_records
-  Command.php                     # commands
   ActivityLog.php                 # activity_log
-  Comment.php                     # comments
+  Instruction.php                 # instructions
 
 database/seeders/
   UserSeeder.php                  # 3 akun: superadmin, dokter, nakes
@@ -292,15 +331,17 @@ resources/views/
     login.blade.php               # Login + image slider
     auth/                         # Forgot & reset password
     nakes/
-      dashboard.blade.php         # Monitoring + respon instruksi dokter (API-connected)
+      dashboard.blade.php         # Monitoring vital sign (API-connected)
       inputdata.blade.php         # Form input pasien
       laporan.blade.php           # Laporan medis + chart
       laporan-pdf.blade.php       # Template PDF
+      instruksi.blade.php         # Chat instruksi dokter + laporan nakes (API-connected)
     dokter/
-      dashboard.blade.php         # Monitoring + komentar untuk nakes (API-connected)
+      dashboard.blade.php         # Monitoring vital sign (API-connected)
       inputdata.blade.php         # Form input pasien
       laporan.blade.php           # Laporan medis + chart
       laporan-pdf.blade.php       # Template PDF
+      instruksi.blade.php         # Chat instruksi medis + pantau laporan nakes (API-connected)
     superadmin/
       dashboard.blade.php         # Stat cards, tabel kritis, log aktivitas
       manajemen-alat.blade.php    # Inventaris alat + modal (CRUD active)
@@ -402,7 +443,7 @@ Data yang di-seed:
 
 #### 7. Jalankan Development Server
 
-Buka **2 terminal** secara bersamaan:
+Buka **4 terminal** secara bersamaan:
 
 **Terminal 1 — Vite (Tailwind CSS & hot reload):**
 ```bash
@@ -412,6 +453,16 @@ npm run dev
 **Terminal 2 — Laravel server:**
 ```bash
 php artisan serve
+```
+
+**Terminal 3 — Queue worker (proses sensor data + ML prediction):**
+```bash
+php artisan queue:work
+```
+
+**Terminal 4 — Reverb WebSocket server (real-time updates):**
+```bash
+php artisan reverb:start
 ```
 
 > Atau jika menggunakan Laragon, akses langsung: `http://sats-repository.test`
@@ -476,7 +527,9 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 | Simulator `ModuleNotFoundError` | Jalankan `pip install -r requirements.txt` di folder `simulasi_py/` |
 | Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
 | Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed di database |
-| Dashboard tidak update | Pastikan simulator berjalan, cek polling interval (5 detik) |
+| Dashboard tidak update | Pastikan simulator berjalan + Reverb & queue worker running |
+| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terpisah |
+| ML prediction tidak muncul | Pastikan `php artisan queue:work` berjalan, cek log untuk "ML trigger" |
 
 ---
 
@@ -530,10 +583,13 @@ Rekam medis ter-generate otomatis
 
 ## Dokumentasi Terkait
 
+- [README.md](README.md) - Gambaran umum project dan panduan setup
+- [DEMO.md](DEMO.md) - Panduan instalasi, menjalankan sistem, dan demo
+- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Dokumentasi API + integrasi ML Hugging Face
 - [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
 - [BACKEND.md](BACKEND.md) - Detail progress backend, API endpoints, service layer, dan simulator
 - [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
 
 ---
 
-*Last updated: 10 Mei 2026*
+*Last updated: 18 Mei 2026*

@@ -47,7 +47,7 @@ class ManajemenAlatController extends Controller
         ]);
 
         // Generate API key (plain text shown once)
-        $plainKey = 'sats_' . Str::random(32);
+        $plainKey = 'sats_' . Str::random(8);
 
         ApiKey::create([
             'device_id' => $device->device_id,

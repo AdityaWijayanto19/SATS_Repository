@@ -1,531 +1,329 @@
 @extends('layouts.app')
+@section('title', 'SATS Monitoring - Dashboard')
 
 @section('content')
+    <main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]" x-data="dashboard()" x-init="init()">
 
-<main
-    class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)]"
-    x-data="dashboard()"
-    x-init="init()"
->
-
-    {{-- Header --}}
-    <div class="flex items-start justify-between mb-5">
-        <div>
-            <h1 class="text-xl font-medium text-[rgb(0,62,48)]">Dashboard Monitoring</h1>
-            <p class="text-sm text-gray-400 mt-1" x-text="selectedDeviceId ?? 'Belum ada perangkat'"></p>
-        </div>
-
-        {{-- Dropdown Perangkat --}}
-        <div class="relative">
-            <button
-                @click="dropdownOpen = !dropdownOpen"
-                class="cursor-pointer px-4 py-2 bg-[rgb(0,62,48)] text-white rounded-lg flex items-center gap-2 text-sm hover:opacity-90 transition"
-            >
-                Pilih Perangkat
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            <div
-                x-show="dropdownOpen"
-                x-transition
-                @click.outside="dropdownOpen = false"
-                class="absolute right-0 mt-2 w-52 bg-white border border-[rgba(0,83,63,0.15)] rounded-xl shadow-sm z-50 overflow-hidden"
-            >
-                <template x-for="device in allDevices" :key="device.device_id">
-                    <div
-                        @click="selectDevice(device.device_id); dropdownOpen = false"
-                        class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer"
-                        :class="device.device_id === selectedDeviceId ? 'text-[rgb(0,62,48)] font-semibold' : 'text-[rgb(0,62,48)]'"
-                        x-text="device.device_id"
-                    ></div>
-                </template>
-            </div>
-        </div>
-    </div>
-
-    {{-- Stat Cards --}}
-    <div class="grid grid-cols-4 gap-3 mb-4">
-
-        {{-- Heart Rate --}}
-        <div class="bg-red-50 rounded-xl p-4 border border-red-200">
-            <p class="text-xs font-medium text-red-400 mb-2">Heart Rate</p>
-            <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                <span x-text="latest?.heart_rate ?? '—'"></span>
-                <span class="text-sm font-normal text-red-400">bpm</span>
-            </p>
-            <p class="text-[10px] mt-1"
-                :class="getStatusClass(latest?.heart_rate, 'hr')"
-                x-text="getStatusText(latest?.heart_rate, 'hr')"
-            ></p>
-        </div>
-
-        {{-- SpO2 --}}
-        <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
-            <p class="text-xs font-medium text-blue-400 mb-2">SpO2</p>
-            <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                <span x-text="latest?.spo2 ?? '—'"></span>
-                <span class="text-sm font-normal text-blue-400">%</span>
-            </p>
-            <p class="text-[10px] mt-1"
-                :class="getStatusClass(latest?.spo2, 'spo2')"
-                x-text="getStatusText(latest?.spo2, 'spo2')"
-            ></p>
-        </div>
-
-        {{-- Temperature --}}
-        <div class="bg-orange-50 rounded-xl p-4 border border-orange-200">
-            <p class="text-xs font-medium text-orange-400 mb-2">Temperature</p>
-            <p class="text-3xl font-medium text-[rgb(0,62,48)]">
-                <span x-text="latest?.temperature ?? '—'"></span>
-                <span class="text-sm font-normal text-orange-400">°C</span>
-            </p>
-            <p class="text-[10px] mt-1"
-                :class="getStatusClass(latest?.temperature, 'temp')"
-                x-text="getStatusText(latest?.temperature, 'temp')"
-            ></p>
-        </div>
-
-        {{-- Kondisi Pasien --}}
-        <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
-            <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
-            <p class="text-2xl font-medium"
-                :class="{
-                    'text-[rgb(0,62,48)]': latest?.status === 'normal',
-                    'text-orange-500':     latest?.status === 'warning',
-                    'text-red-500':        latest?.status === 'critical'
-                }"
-                x-text="latest?.status ? (latest.status.charAt(0).toUpperCase() + latest.status.slice(1)) : '—'"
-            ></p>
-            <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">
-                Pembaruan: <span x-text="latest?.created_at ?? '—'"></span>
-            </p>
-        </div>
-
-    </div>
-
-    {{-- Prediksi ML --}}
-    <div class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
-        <span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>
-
-        <div class="flex-1">
-            <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
-            <p class="text-sm font-medium text-[rgb(0,62,48)]">
-                <span x-show="latest?.prediction" x-text="latest?.prediction"></span>
-                <span x-show="!latest?.prediction">Data prediksi belum tersedia.</span>
-            </p>
-        </div>
-
-        <span
-            class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
-            :class="{
-                'bg-green-100 text-green-700': latest?.status === 'normal',
-                'bg-orange-100 text-orange-700': latest?.status === 'warning',
-                'bg-red-100 text-red-700': latest?.status === 'critical'
-            }"
-            x-text="statusLabel(latest?.status)"
-        ></span>
-    </div>
-
-    {{-- Grafik Sensor --}}
-    <div class="grid grid-cols-3 gap-3">
-
-        @foreach ([
-            ['id' => 'hrChart',   'label' => 'Heart Rate',   'unit' => 'bpm'],
-            ['id' => 'spo2Chart', 'label' => 'SpO2',         'unit' => '%'],
-            ['id' => 'tempChart', 'label' => 'Temperature',  'unit' => '°C'],
-        ] as $chart)
-        <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
-            <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
-                <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $chart['label'] }}</p>
-                <p class="text-[11px] text-gray-400 mt-0.5">{{ $chart['unit'] }} — 10 menit terakhir</p>
-            </div>
-            {{-- position:relative wajib agar Chart.js bisa hitung tinggi --}}
-            <div class="p-4 relative" style="height:200px;">
-                <canvas id="{{ $chart['id'] }}"></canvas>
-            </div>
-        </div>
-        @endforeach
-
-    </div>
-
-    {{-- Instruksi Dokter --}}
-    <div class="mt-4" x-data="komentarNakes()">
-        <div class="bg-white rounded-xl border border-[rgba(0,83,63,0.1)] overflow-hidden">
-
-            {{-- Header --}}
-            <div class="px-5 py-3.5 border-b border-[rgba(0,83,63,0.08)] flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-[rgb(0,62,48)]">Instruksi dari Dokter</p>
-                    <p class="text-[11px] text-gray-400 mt-0.5">Respon instruksi dan checklist yang sudah dilakukan</p>
-                </div>
-                <span class="text-[10px] font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full"
-                    x-text="activeCount + ' instruksi aktif'"
-                ></span>
-            </div>
-
-            {{-- List --}}
+        {{-- Header: Selalu Muncul --}}
+        <div class="flex items-start justify-between mb-5">
             <div>
-                <template x-if="activeCount === 0">
-                    <p class="px-5 py-4 text-sm text-gray-400 text-center">Tidak ada instruksi dari dokter.</p>
-                </template>
+                <h1 class="text-xl font-medium text-[rgb(0,62,48)]">Dashboard Monitoring</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <p class="text-sm text-gray-400" x-text="selectedDeviceId ?? 'Belum ada perangkat'"></p>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        :class="deviceOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                        x-text="deviceOnline ? 'Online' : 'Offline'"></span>
+                </div>
+            </div>
 
-                <template x-for="item in komentar" :key="item.id">
-                    <div x-show="!item.checked" class="px-5 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                        <div class="flex items-start gap-3">
+            <div class="flex items-center gap-2">
+                {{-- Toggle Perangkat --}}
+                <button @click="toggleDevice()"
+                    class="cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition"
+                    :class="deviceOnline
+                        ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'">
+                    <span x-text="deviceOnline ? 'Matikan Perangkat' : 'Aktifkan Perangkat'"></span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5.636 5.636a9 9 0 1012.728 0M12 3v6" />
+                    </svg>
+                </button>
 
-                            {{-- Checkbox --}}
-                            <label class="mt-1 flex-shrink-0 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    x-model="item.checked"
-                                    @change="onChecked(item)"
-                                    class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                >
-                            </label>
+                {{-- Ganti Perangkat --}}
+                <form method="POST" action="{{ route('nakes.device-config.reset') }}"
+                    onsubmit="return confirm('Ganti perangkat? Anda harus mengonfigurasi perangkat baru.')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit"
+                        class="cursor-pointer px-4 py-2 bg-[rgb(0,62,48)] text-white rounded-lg flex items-center gap-2 text-sm hover:opacity-90 transition">
+                        Ganti Perangkat
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
 
-                            {{-- Avatar Dokter --}}
-                            <div class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">D</div>
+        {{-- Stat Cards --}}
+        <div class="grid grid-cols-4 gap-3 mb-4">
 
-                            {{-- Konten --}}
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-xs font-semibold text-gray-700" x-text="item.user_name"></span>
-                                    <span class="text-[10px] text-gray-400" x-text="item.waktu"></span>
-                                </div>
+            {{-- Heart Rate --}}
+            <div class="bg-red-50 rounded-xl p-4 border border-red-200">
+                <p class="text-xs font-medium text-red-400 mb-2">Heart Rate</p>
+                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                    <span x-text="latest?.heart_rate ?? '—'"></span>
+                    <span class="text-sm font-normal text-red-400">bpm</span>
+                </p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.heart_rate, 'hr')"
+                    x-text="getStatusText(latest?.heart_rate, 'hr')"></p>
+            </div>
 
-                                <p class="text-sm text-gray-600 mb-2" x-text="item.teks"></p>
+            {{-- SpO2 --}}
+            <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <p class="text-xs font-medium text-blue-400 mb-2">SpO2</p>
+                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                    <span x-text="latest?.spo2 ?? '—'"></span>
+                    <span class="text-sm font-normal text-blue-400">%</span>
+                </p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.spo2, 'spo2')"
+                    x-text="getStatusText(latest?.spo2, 'spo2')"></p>
+            </div>
 
-                                {{-- Form Respon --}}
-                                <template x-if="!item.respon">
-                                    <div class="flex items-center gap-2">
-                                        <select
-                                            x-model="item.selectedRespon"
-                                            class="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all"
-                                        >
-                                            <option value="" disabled selected>Pilih respon...</option>
-                                            <option>Sudah dilakukan</option>
-                                            <option>Tidak bisa dilakukan</option>
-                                            <option>Tidak memungkinkan</option>
-                                            <option>Sedang diproses</option>
-                                            <option>Butuh konfirmasi ulang</option>
-                                        </select>
-                                        <button
-                                            @click="kirimRespon(item)"
-                                            :disabled="!item.selectedRespon"
-                                            class="text-xs font-medium text-white px-3 py-1.5 rounded-lg cursor-pointer transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed bg-[rgb(0,83,63)]"
-                                        >Kirim</button>
-                                    </div>
-                                </template>
+            {{-- Temperature --}}
+            <div class="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                <p class="text-xs font-medium text-orange-400 mb-2">Temperature</p>
+                <p class="text-3xl font-medium text-[rgb(0,62,48)]">
+                    <span x-text="latest?.temperature ?? '—'"></span>
+                    <span class="text-sm font-normal text-orange-400">°C</span>
+                </p>
+                <p class="text-[10px] mt-1" :class="getStatusClass(latest?.temperature, 'temp')"
+                    x-text="getStatusText(latest?.temperature, 'temp')"></p>
+            </div>
 
-                                {{-- Respon Terkirim --}}
-                                <template x-if="item.respon">
-                                    <div class="mt-1.5 pl-3 border-l-2 border-emerald-300 bg-emerald-50 rounded-r-lg py-1.5 px-3">
-                                        <div class="flex items-center gap-1.5 mb-0.5">
-                                            <span class="text-[10px] font-semibold text-emerald-700">Respon Anda</span>
-                                            <span class="text-[10px] text-emerald-500" x-text="item.responWaktu"></span>
-                                        </div>
-                                        <p class="text-xs text-emerald-800" x-text="item.respon"></p>
-                                    </div>
-                                </template>
-
-                            </div>
-                        </div>
-                    </div>
-                </template>
+            {{-- Kondisi Pasien --}}
+            <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
+                <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
+                <p class="text-2xl font-medium"
+                    :class="{
+                        'text-[rgb(0,62,48)]': latest?.status === 'normal',
+                        'text-orange-500': latest?.status === 'warning',
+                        'text-red-500': latest?.status === 'critical'
+                    }"
+                    x-text="latest?.status ? (latest.status.charAt(0).toUpperCase() + latest.status.slice(1)) : '—'"></p>
+                <p class="text-[10px] text-[rgba(0,62,48,0.5)] mt-1">
+                    Pembaruan: <span x-text="latest?.created_at ?? '—'"></span>
+                </p>
             </div>
 
         </div>
-    </div>
 
-</main>
+        {{-- Prediksi ML --}}
+        <div x-show="latest"
+            class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
+            <span class="w-2 h-2 rounded-full flex-shrink-0"
+                :class="{
+                    'bg-green-400': latest?.ml_condition === 'NORMAL',
+                    'bg-orange-400': latest?.ml_condition === 'WARNING',
+                    'bg-red-400': latest?.ml_condition === 'CRITICAL',
+                    'bg-gray-300': !latest?.ml_condition
+                }"></span>
 
-@push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-/* 
-   Konstanta & Helpers
-*/
+            <div class="flex-1">
+                <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
+                <p class="text-sm font-medium text-[rgb(0,62,48)]">
+                    <span x-show="latest?.ml_prediction" x-text="latest?.ml_prediction"></span>
+                    <span x-show="!latest?.ml_prediction">Data prediksi belum tersedia.</span>
+                </p>
+            </div>
 
-const THRESHOLDS = {
-    hr:   { normal: [60, 100],  warning: [50, 120] },
-    spo2: { normal: [95, 100],  warning: [90, 94]  },
-    temp: { normal: [36.0, 37.5], warning: [37.6, 38.5] },
-};
+            <span x-show="latest?.ml_condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
+                :class="{
+                    'bg-green-100 text-green-700': latest?.ml_condition === 'NORMAL',
+                    'bg-orange-100 text-orange-700': latest?.ml_condition === 'WARNING',
+                    'bg-red-100 text-red-700': latest?.ml_condition === 'CRITICAL'
+                }"
+                x-text="latest?.ml_risk_level ?? latest?.ml_condition"></span>
+        </div>
 
-function getVitalStatus(value, type) {
-    if (value == null) return 'unknown';
-    const t = THRESHOLDS[type];
-    if (value >= t.normal[0] && value <= t.normal[1]) return 'normal';
-    if (type === 'hr'   && value >= t.warning[0] && value <= t.warning[1]) return 'warning';
-    if (type === 'spo2' && value >= t.warning[0] && value <= t.warning[1]) return 'warning';
-    if (type === 'temp' && value >= t.normal[1]  && value <= t.warning[1]) return 'warning';
-    return 'critical';
-}
+        {{-- Probabilitas Kondisi Pasien --}}
+        <div x-show="latest?.ml_probabilities" x-transition
+            class="grid grid-cols-3 gap-3 mb-4">
 
-const STATUS_CLASS = {
-    normal:   { hr: 'text-red-400',    spo2: 'text-blue-400',  temp: 'text-orange-400' },
-    warning:  { hr: 'text-amber-500',  spo2: 'text-amber-500', temp: 'text-amber-500'  },
-    critical: { hr: 'text-red-600',    spo2: 'text-red-600',   temp: 'text-red-600'    },
-    unknown:  { hr: 'text-gray-400',   spo2: 'text-gray-400',  temp: 'text-gray-400'   },
-};
+            {{-- Membaik --}}
+            <div class="bg-green-50 rounded-xl p-4 border border-green-200 text-center">
+                <p class="text-xs font-medium text-green-500 mb-1">Membaik</p>
+                <p class="text-3xl font-bold text-green-600"
+                    x-text="(latest?.ml_probabilities?.membaik ?? '—') + (latest?.ml_probabilities?.membaik != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-green-100 rounded-full h-1.5">
+                    <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.membaik ?? 0) + '%'"></div>
+                </div>
+            </div>
 
-const STATUS_TEXT = { normal: 'Normal', warning: 'Warning', critical: 'Critical', unknown: 'Tidak ada data' };
-const STATUS_LABEL = { normal: 'Aman', warning: 'Perhatian', critical: 'Kritis' };
+            {{-- Stabil --}}
+            <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-center">
+                <p class="text-xs font-medium text-yellow-500 mb-1">Stabil</p>
+                <p class="text-3xl font-bold text-yellow-600"
+                    x-text="(latest?.ml_probabilities?.stabil ?? '—') + (latest?.ml_probabilities?.stabil != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-yellow-100 rounded-full h-1.5">
+                    <div class="bg-yellow-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.stabil ?? 0) + '%'"></div>
+                </div>
+            </div>
 
-/*
-   Chart Helpers
-*/
+            {{-- Memburuk --}}
+            <div class="bg-red-50 rounded-xl p-4 border border-red-200 text-center">
+                <p class="text-xs font-medium text-red-400 mb-1">Memburuk</p>
+                <p class="text-3xl font-bold text-red-500"
+                    x-text="(latest?.ml_probabilities?.memburuk ?? '—') + (latest?.ml_probabilities?.memburuk != null ? '%' : '')"></p>
+                <div class="mt-2 w-full bg-red-100 rounded-full h-1.5">
+                    <div class="bg-red-500 h-1.5 rounded-full transition-all duration-500"
+                        :style="'width:' + (latest?.ml_probabilities?.memburuk ?? 0) + '%'"></div>
+                </div>
+            </div>
 
-function makeGradient(ctx, hex) {
-    const g = ctx.createLinearGradient(0, 0, 0, 160);
-    g.addColorStop(0, hex + '35');
-    g.addColorStop(1, hex + '00');
-    return g;
-}
+        </div>
 
-function buildChartConfig(ctx, color, yMin, yMax) {
-    return {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                data: [],
-                borderColor: color,
-                backgroundColor: makeGradient(ctx, color),
-                borderWidth: 1.5,
-                fill: true,
-                tension: 0.4,
-            }],
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { mode: 'index', intersect: false },
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 10 }, color: '#8aab9f' },
-                },
-                y: {
-                    min: yMin,
-                    max: yMax,
-                    grid: { color: 'rgba(0,83,63,0.07)', lineWidth: 0.5 },
-                    ticks: { font: { size: 10 }, color: '#8aab9f' },
-                },
-            },
-            elements: { point: { radius: 2.5, hoverRadius: 5 } },
-        },
-    };
-}
+        {{-- Grafik Sensor --}}
+        <div class="grid grid-cols-3 gap-3">
 
-/*
-   Alpine -> dashboard()
-*/
+            @foreach ([['id' => 'hrChart', 'label' => 'Heart Rate', 'unit' => 'bpm'], ['id' => 'spo2Chart', 'label' => 'SpO2', 'unit' => '%'], ['id' => 'tempChart', 'label' => 'Temperature', 'unit' => '°C']] as $chart)
+                <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
+                    <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
+                        <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $chart['label'] }}</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">{{ $chart['unit'] }} — 10 menit terakhir</p>
+                    </div>
+                    {{-- position:relative wajib agar Chart.js bisa hitung tinggi --}}
+                    <div class="p-4 relative" style="height:200px;">
+                        <canvas id="{{ $chart['id'] }}"></canvas>
+                    </div>
+                </div>
+            @endforeach
+        </div>
 
-const initialDevices = @json($devices);
+    </main>
 
-// Disimpan di luar Alpine agar tidak dibungkus Proxy
-const _chartInstances = {};
+    @include('components.chat-widget')
 
-let _selectedDeviceId = initialDevices[0]?.device_id ?? null;
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            // Global state untuk share data antar Alpine components
+            let globalSelectedDeviceId = null;
 
-function dashboard() {
-    return {
-        allDevices:       initialDevices,
-        selectedDeviceId: _selectedDeviceId,
-        latest:           initialDevices[0]?.latest    ?? null,
-        dropdownOpen:     false,
-        _pollTimer:       null,
-        _devicePollTimer: null,
-        _lastChartLabels: null,
+            // Chart instances
+            let hrChart, spo2Chart, tempChart;
 
-        init() {
-            setTimeout(async () => {
-                this._initCharts();
-                if (this.selectedDeviceId) await this._fetchChartData();
-                this._pollTimer = setInterval(() => {
-                    this._pollLatest();
-                    this._fetchChartData();
-                }, 5_000);
-                this._devicePollTimer = setInterval(() => this._pollDevices(), 10_000);
-            }, 150);
-        },
-
-        selectDevice(deviceId) {
-            _selectedDeviceId     = deviceId;
-            this.selectedDeviceId = deviceId;
-            this._lastChartLabels = null;
-            this.latest = this.allDevices.find(d => d.device_id === deviceId)?.latest ?? null;
-            this._fetchChartData();
-        },
-
-        statusLabel(status) {
-            return STATUS_LABEL[status] ?? '—';
-        },
-
-        getStatusClass(value, type) {
-            return STATUS_CLASS[getVitalStatus(value, type)][type];
-        },
-
-        getStatusText(value, type) {
-            return STATUS_TEXT[getVitalStatus(value, type)];
-        },
-
-        _initCharts() {
-            // Destroy dulu kalau ada instance lama
-            Object.values(_chartInstances).forEach(c => c.destroy());
-
-            const specs = [
-                { key: 'hr',   id: 'hrChart',   color: '#ef4444', yMin: 40, yMax: 160 },
-                { key: 'spo2', id: 'spo2Chart', color: '#3b82f6', yMin: 80, yMax: 100 },
-                { key: 'temp', id: 'tempChart', color: '#f97316', yMin: 35, yMax: 42  },
-            ];
-
-            specs.forEach(({ key, id, color, yMin, yMax }) => {
-                const ctx = document.getElementById(id).getContext('2d');
-                _chartInstances[key] = new Chart(ctx, buildChartConfig(ctx, color, yMin, yMax));
-            });
-        },
-
-        _updateCharts(data) {
-            const mapping = { hr: 'heart_rate', spo2: 'spo2', temp: 'temperature' };
-            const newLabels = JSON.stringify(data.labels);
-            if (newLabels === this._lastChartLabels) return;
-            this._lastChartLabels = newLabels;
-            Object.entries(mapping).forEach(([key, field]) => {
-                const chart = _chartInstances[key];
-                if (!chart) return;
-                chart.data.labels           = data.labels;
-                chart.data.datasets[0].data = data[field];
-                chart.update('none');
-            });
-        },
-
-        async _fetchChartData() {
-            if (!this.selectedDeviceId) return;
-            try {
-                const res  = await fetch(`/api/device/${this.selectedDeviceId}/sensor-data/history?minutes=10`);
-                const json = await res.json();
-                if (json.success && json.data) this._updateCharts(json.data);
-            } catch { /* silent */ }
-        },
-
-        async _pollLatest() {
-            if (!this.selectedDeviceId) return;
-            try {
-                const res  = await fetch(`/api/device/${this.selectedDeviceId}/sensor-data/latest`, {
-                    headers: { Accept: 'application/json' },
-                });
-                const json = await res.json();
-                if (!json.success || !json.data) return;
-
-                const d = json.data;
-                this.latest = {
-                    heart_rate:  d.heart_rate,
-                    spo2:        d.spo2,
-                    temperature: d.temperature,
-                    status:      d.status,
-                    prediction:  d.prediction ?? null,
-                    created_at:  new Date(d.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            function initCharts() {
+                const chartOpts = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } },
+                        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 } } }
+                    },
+                    elements: { point: { radius: 2, hoverRadius: 4 }, line: { tension: 0.3, borderWidth: 2 } }
                 };
 
-                const device = this.allDevices.find(d => d.device_id === this.selectedDeviceId);
-                if (device) device.latest = this.latest;
-            } catch { /* silent */ }
-        },
-
-        async _pollDevices() {
-            try {
-                const res  = await fetch('/api/devices', { headers: { Accept: 'application/json' } });
-                const json = await res.json();
-                if (!json.success) return;
-                const newDevices = json.data;
-                const oldIds = this.allDevices.map(d => d.device_id);
-                const newIds = newDevices.map(d => d.device_id);
-                if (JSON.stringify(oldIds) === JSON.stringify(newIds)) return;
-                this.allDevices = newDevices;
-                if (!newIds.includes(this.selectedDeviceId)) {
-                    this.selectDevice(newIds[0] ?? null);
-                }
-            } catch { /* silent */ }
-        },
-    };
-}
-
-/*
-   Alpine -> komentarNakes()
-*/
-
-function komentarNakes() {
-    return {
-        komentar: [],
-        _pollTimer: null,
-        _checkedIds: new Set(),
-
-        async init() {
-            await this._fetch();
-            this._pollTimer = setInterval(() => this._fetch(), 5000);
-        },
-
-        get activeCount() {
-            return this.komentar.filter(k => !k.checked).length;
-        },
-
-        async _fetch() {
-            const did = _selectedDeviceId;
-            if (!did) return;
-            try {
-                const res = await fetch(`/api/comments?device_id=${did}`, {
-                    headers: { 'Accept': 'application/json' }
+                hrChart = new Chart(document.getElementById('hrChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 40, max: 160 } } }
                 });
-                const json = await res.json();
-                if (json.success) {
-                    const currentIds = new Set(json.data.map(c => c.id));
-                    this._checkedIds.forEach(id => { if (!currentIds.has(id)) this._checkedIds.delete(id); });
-                    this.komentar = json.data.map(c => ({
-                        ...c,
-                        selectedRespon: '',
-                        checked: this._checkedIds.has(c.id),
-                    }));
-                }
-            } catch { /* silent */ }
-        },
-
-        async kirimRespon(item) {
-            if (!item.selectedRespon) return;
-            try {
-                const res = await fetch(`/api/comments/${item.id}/respond`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: JSON.stringify({ respon: item.selectedRespon }),
+                spo2Chart = new Chart(document.getElementById('spo2Chart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 85, max: 100 } } }
                 });
-                const json = await res.json();
-                if (json.success) {
-                    item.respon = json.data.respon;
-                    item.responWaktu = json.data.responWaktu;
-                }
-            } catch { /* silent */ }
-        },
-
-        onChecked(item) {
-            if (item.checked) {
-                this._checkedIds.add(item.id);
-            } else {
-                this._checkedIds.delete(item.id);
+                tempChart = new Chart(document.getElementById('tempChart'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true }] },
+                    options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 35, max: 40 } } }
+                });
             }
-        },
-    };
-}
-</script>
-@endpush
 
+            function updateCharts(history) {
+                if (!history) {
+                    [hrChart, spo2Chart, tempChart].forEach(c => {
+                        if (c) { c.data.labels = []; c.data.datasets[0].data = []; c.update('none'); }
+                    });
+                    return;
+                }
+                hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = history.heart_rate; hrChart.update('none');
+                spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = history.spo2; spo2Chart.update('none');
+                tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = history.temperature; tempChart.update('none');
+            }
+
+            function dashboard() {
+                return {
+                    selectedDeviceId: null,
+                    latest: null,
+                    deviceOnline: false,
+
+                    async init() {
+                        initCharts();
+                        try {
+                            const res = await fetch('/api/devices');
+                            const json = await res.json();
+                            if (json.success && json.data.length > 0) {
+                                const device = json.data[0];
+                                this.selectedDeviceId = device.device_id;
+                                globalSelectedDeviceId = this.selectedDeviceId;
+                                this.latest = device.latest;
+                                this.deviceOnline = device.status === 'online';
+                                updateCharts(device.history);
+                                window.dispatchEvent(new CustomEvent('deviceSelected', {
+                                    detail: { deviceId: this.selectedDeviceId }
+                                }));
+                                this.setupRealtime();
+                            }
+                        } catch (e) {
+                            console.error('Error fetching devices:', e);
+                        }
+                    },
+
+                    setupRealtime() {
+                        if (!window.Echo || !this.selectedDeviceId) return;
+                        window.Echo.private(`device.${this.selectedDeviceId}`)
+                            .listen('.device.status.changed', (e) => {
+                                this.deviceOnline = e.status === 'online';
+                            })
+                            .listen('.sensor.data.received', (e) => {
+                                this.latest = e.latest;
+                                updateCharts(e.history);
+                            });
+                    },
+
+                    async toggleDevice() {
+                        const newStatus = this.deviceOnline ? 'offline' : 'online';
+                        this.deviceOnline = newStatus === 'online';
+                        try {
+                            const res = await fetch('/nakes/device-status', {
+                                method: 'PATCH',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                },
+                                body: JSON.stringify({ status: newStatus }),
+                            });
+                            const json = await res.json();
+                            if (!json.success) {
+                                this.deviceOnline = newStatus !== 'online';
+                            }
+                        } catch (e) {
+                            this.deviceOnline = newStatus !== 'online';
+                            console.error('Error toggling device:', e);
+                        }
+                    },
+
+                    getStatusClass(v, t) {
+                        if (!v) return 'text-gray-400';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'spo2') return (v < 95) ? 'text-red-500' : 'text-green-500';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'text-orange-500' : 'text-green-500';
+                    },
+
+                    getStatusText(v, t) {
+                        if (!v) return '—';
+                        if (t === 'hr') return (v < 60 || v > 100) ? 'Abnormal' : 'Normal';
+                        if (t === 'spo2') return (v < 95) ? 'Rendah' : 'Normal';
+                        if (t === 'temp') return (v < 36 || v > 37.5) ? 'Abnormal' : 'Normal';
+                    },
+
+                    destroy() {
+                        if (this.selectedDeviceId && window.Echo) {
+                            window.Echo.leave(`device.${this.selectedDeviceId}`);
+                        }
+                    }
+                };
+            }
+
+        </script>
+    @endpush
 @endsection

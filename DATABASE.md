@@ -12,20 +12,21 @@ Database `sats_db` digunakan oleh sistem SATS (Smart Ambulance Telemedicine Syst
 +-------------+       +----------------+       +------------------+
 |   users     |       |   patients     |       |    devices       |
 |-------------|       |----------------|       |------------------|
-| user_id (PK)|<------+ nakes (FK)     |       | device_id (PK)   |
-| username    |       | patient_id(PK) |       | status           |
-| email       |       | device_id (FK) +------>| last_seen        |
-| password    |       | nama           |       +------------------+
-| role        |       | jenis_kelamin  |               |
-+-------------+       | umur           |               |
-                      | catatan_tambahan|               |
-                      +----------------+               |
+| id (PK)     |<------+ nakes (FK)     |       | device_id (PK)   |
+| name        |       | id (PK)        |       | status           |
+| email       |       | device_id (FK) +------>| ml_prediction    |
+| password    |       | nama           |       | ml_condition     |
+| role        |       | jenis_kelamin  |       | ml_risk_level    |
++-------------+       | umur           |       | ml_probabilities |
+                      | catatan_tambahan|       | ml_predicted_at  |
+                      +----------------+       | last_seen        |
+                                               +------------------+
                               |                        |
                               v                        v
                       +------------------+    +-------------------+
-                      | medical_records  |    |   sensor_data     |
+                      | medical_records  |    |   sensor_datas    |
                       |------------------|    |-------------------|
-                      | med_records_id   |    | id (PK)           |
+                      | id (PK)          |    | id (PK)           |
                       | patient_id (FK)  |    | device_id (FK)    |
                       | device_id (FK)   |    | heart_rate        |
                       | heart_rate       |    | spo2              |
@@ -36,20 +37,26 @@ Database `sats_db` digunakan oleh sistem SATS (Smart Ambulance Telemedicine Syst
                       | created_at       |    +-------------------+
                       +------------------+
 
-+----------------+       +----------------+       +----------------+
-| activity_log   |       |   commands     |       | system_status  |
-|----------------|       |----------------|       |----------------|
-| id (PK)        |       | id (PK)        |       | device_id (FK) |
-| message        |       | device_id (FK) |       | monitoring_    |
-| created_at     |       | command        |       |   status       |
-+----------------+       | status         |       +----------------+
-                         | created_at     |
-                         +----------------+
++----------------+       +--------------------+       +----------------+
+| activity_log   |       |   instructions     |       | system_statuses|
+|----------------|       |--------------------|       |----------------|
+| id (PK)        |       | id (PK)            |       | device_id (PK) |
+| message        |       | device_id (FK)     |       | monitoring_    |
+| created_at     |       | dokter_id (FK)     |       |   status       |
++----------------+       | nakes_id (FK)      |       | battery_level  |
+                         | instruksi_dokter   |       | signal_strength|
+                         | respon_nakes       |       +----------------+
+                         | laporan_nakes      |
+                         | is_completed       |
+                         | completed_at       |
+                         | completed_by (FK)  |
+                         +--------------------+
 
 +----------------+
 |   api_keys     |
 |----------------|
 | id (PK)        |
+| device_id (FK) |
 | key            |
 | name           |
 | is_active      |
@@ -84,6 +91,11 @@ Menyimpan data perangkat SATS Wearable yang terdaftar.
 |-----------|---------|------------------|--------------------------------|
 | device_id | varchar | PK               | ID unik perangkat (e.g. DEV-001) |
 | status    | enum    | NOT NULL         | `online`, `offline`            |
+| ml_prediction | text | NULL            | Teks prediksi dari ML (e.g. "Pasien akan MEMBURUK...") |
+| ml_condition | varchar | NULL          | Kondisi dari ML: `NORMAL`, `WARNING`, `CRITICAL` |
+| ml_risk_level | varchar | NULL         | Risk level: `Low Risk`, `Medium Risk`, `High Risk` |
+| ml_probabilities | text | NULL         | JSON probabilitas: `{"membaik":11,"stabil":26,"memburuk":63}` |
+| ml_predicted_at | timestamp | NULL      | Waktu prediksi ML terakhir dijalankan |
 | last_seen | timestamp | NULL           | Terakhir perangkat mengirim data |
 
 ---
@@ -139,21 +151,7 @@ Menyimpan rekam medis pasien yang sudah diinput oleh nakes setelah pasien tiba d
 
 ---
 
-### 6. `commands`
-
-Menyimpan perintah start/stop yang dikirim ke perangkat dari dashboard.
-
-| Kolom      | Tipe    | Constraint    | Keterangan                        |
-|------------|---------|---------------|-----------------------------------|
-| id         | int     | PK, auto-increm | ID unik perintah                |
-| device_id  | varchar | FK → devices  | Perangkat target perintah         |
-| command    | enum    | NOT NULL      | `start`, `stop`                   |
-| status     | enum    | NOT NULL      | `pending`, `done`                 |
-| created_at | timestamp | auto        | Waktu perintah dibuat             |
-
----
-
-### 7. `activity_log`
+### 6. `activity_log`
 
 Menyimpan log aktivitas sistem untuk audit trail.
 
@@ -165,14 +163,37 @@ Menyimpan log aktivitas sistem untuk audit trail.
 
 ---
 
-### 8. `system_status`
+### 7. `system_statuses`
 
-Menyimpan status monitoring perangkat.
+Menyimpan status monitoring perangkat (battery, signal).
 
 | Kolom             | Tipe    | Constraint   | Keterangan                       |
 |-------------------|---------|--------------|----------------------------------|
-| device_id         | varchar | FK → devices | Perangkat terkait                |
+| device_id         | varchar | PK           | Perangkat terkait                |
 | monitoring_status | enum    | NOT NULL     | `active`, `inactive`             |
+| battery_level     | int     | NULL         | Level baterai (0-100%)           |
+| signal_strength   | int     | NULL         | Kekuatan sinyal (dBm)            |
+
+---
+
+### 8. `instructions`
+
+Menyimpan instruksi dokter ke nakes dan laporan nakes ke dokter.
+
+| Kolom            | Tipe      | Constraint       | Keterangan                              |
+|------------------|-----------|------------------|-----------------------------------------|
+| id               | int       | PK, auto-increm  | ID unik instruksi                       |
+| device_id        | varchar   | FK → devices     | Perangkat terkait                       |
+| dokter_id        | int       | FK → users, NULL | Dokter yang memberi instruksi           |
+| nakes_id         | int       | FK → users, NULL | Nakes yang melaksanakan                 |
+| instruksi_dokter | text      | NOT NULL         | Teks instruksi dari dokter              |
+| respon_nakes     | text      | NULL             | Respon nakes terhadap instruksi         |
+| laporan_nakes    | text      | NULL             | Laporan kejadian dari nakes             |
+| is_completed     | boolean   | default false    | Status penyelesaian instruksi           |
+| completed_at     | timestamp | NULL             | Waktu instruksi diselesaikan            |
+| completed_by     | int       | FK → users, NULL | User yang menyelesaikan                 |
+| created_at       | timestamp | auto             | Waktu instruksi dibuat                  |
+| updated_at       | timestamp | auto             | Waktu instruksi terakhir diupdate       |
 
 ---
 
@@ -197,11 +218,14 @@ Menyimpan API key untuk autentikasi integrasi IoT.
 |-----------------|----------------|--------------|--------------|-----------------------------------------|
 | `patients`      | `device_id`    | `devices`    | Many-to-One  | Satu pasien terhubung ke satu perangkat |
 | `patients`      | `nakes`        | `users`      | Many-to-One  | Satu nakes menangani banyak pasien      |
-| `sensor_data`   | `device_id`    | `devices`    | Many-to-One  | Satu perangkat mengirim banyak data     |
+| `sensor_datas`  | `device_id`    | `devices`    | Many-to-One  | Satu perangkat mengirim banyak data     |
 | `medical_records`| `patient_id`  | `patients`   | Many-to-One  | Satu pasien punya banyak rekam medis    |
 | `medical_records`| `device_id`   | `devices`    | Many-to-One  | Rekam medis terkait perangkat           |
-| `commands`      | `device_id`    | `devices`    | Many-to-One  | Banyak perintah ke satu perangkat       |
-| `system_status` | `device_id`    | `devices`    | One-to-One   | Satu perangkat punya satu status        |
+| `instructions`  | `device_id`    | `devices`    | Many-to-One  | Banyak instruksi ke satu perangkat      |
+| `instructions`  | `dokter_id`    | `users`      | Many-to-One  | Satu dokter punya banyak instruksi      |
+| `instructions`  | `nakes_id`     | `users`      | Many-to-One  | Satu nakes menangani banyak instruksi   |
+| `instructions`  | `completed_by` | `users`      | Many-to-One  | User yang menyelesaikan instruksi       |
+| `system_statuses`| `device_id`   | `devices`    | One-to-One   | Satu perangkat punya satu status        |
 
 ---
 
@@ -259,20 +283,22 @@ Tabel berikut sudah ada dari migration default Laravel:
 
 ## Seeder
 
-| Seeder              | Tabel    | Data                                              |
-|---------------------|----------|---------------------------------------------------|
-| `UserSeeder.php`    | `users`  | 3 akun: superadmin, dokter, nakes                 |
+| Seeder              | Tabel       | Data                                              |
+|---------------------|-------------|---------------------------------------------------|
+| `UserSeeder.php`    | `users`     | 3 akun: superadmin, dokter, nakes                 |
+| `DeviceSeeder.php`  | `devices` + `api_keys` | 2 device + 2 API key                  |
 
 ---
 
 ## Catatan Implementasi
 
-- **Tipe data `device_id`**: Menggunakan `varchar` karena ID perangkat berformat string (e.g. `DEV-001`), bukan auto-increment integer.
-- **`sensor_data` vs `medical_records`**: `sensor_data` menyimpan data real-time dari IoT secara terus-menerus, sedangkan `medical_records` adalah ringkasan yang diinput nakes setelah pasien tiba.
-- **`commands`**: Digunakan untuk mengontrol perangkat (start/stop) dari dashboard, berfungsi sebagai queue perintah.
-- **`api_keys`**: Digunakan untuk autentikasi request dari perangkat IoT ke API Laravel.
-- **Status klasifikasi**: `normal`, `warning`, `critical` digunakan di `sensor_data` dan `medical_records` berdasarkan rule-based classification dari perangkat IoT.
+- **Tipe data `device_id`**: Menggunakan `varchar` karena ID perangkat berformat string (e.g. `DEVICE_01`), bukan auto-increment integer.
+- **`sensor_datas` vs `medical_records`**: `sensor_datas` menyimpan data real-time dari IoT secara terus-menerus, sedangkan `medical_records` adalah ringkasan yang diinput nakes setelah pasien tiba.
+- **`instructions`**: Menggantikan tabel `comments` dan `commands`. Menyimpan instruksi dokter→nakes dan laporan nakes→dokter dalam satu tabel.
+- **`api_keys`**: Digunakan untuk autentikasi request dari perangkat IoT ke API Laravel. Key di-hash untuk keamanan.
+- **Status klasifikasi**: `normal`, `warning`, `critical` digunakan di `sensor_datas` dan `medical_records` berdasarkan rule-based classification dari perangkat IoT.
+- **Migration `patients`**: Migration dihapus (commit `2dadceb`), tapi model `Patient.php` masih ada untuk referensi.
 
 ---
 
-*Last updated: 10 Mei 2026*
+*Last updated: 18 Mei 2026*

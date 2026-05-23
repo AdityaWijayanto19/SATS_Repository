@@ -24,9 +24,9 @@ app/
       LaporanController.php             # Laporan HTML + PDF nakes/dokter
       SuperadminLaporanController.php   # Laporan HTML + PDF superadmin
       Api/
-        DeviceAuthController.php        # Autentikasi device, sensor data, system status
-        SensorDataController.php        # Legacy sensor data endpoint
-        CommentController.php           # Komentar dokter-nakes
+        DeviceDataController.php        # Autentikasi device, system status, device config
+        SensorDataController.php        # Sensor data endpoint (store, latest, history)
+        InstructionController.php       # Instruksi dokter-nakes (CRUD + report + complete)
     Middleware/
       AuthenticateApiKey.php            # Validasi X-API-Key untuk device IoT
       RoleMiddleware.php                # Cek role user (nakes/dokter/superadmin)
@@ -38,23 +38,39 @@ app/
       UpdateUserRequest.php
       StoreSensorDataRequest.php
       StoreSystemStatusRequest.php
+      StoreInstructionRequest.php
+      UpdateInstructionRequest.php
+      StoreInstructionReportRequest.php
+      CompleteInstructionRequest.php
   Models/
     User.php                            # users
-    Devices.php                         # devices (PK: device_id string)
+    Devices.php                         # devices (PK: device_id string, ML fields)
     SensorData.php                      # sensor_datas
     SystemStatus.php                    # system_statuses
     ApiKey.php                          # api_keys
     Patient.php                         # patients
     MedicalRecord.php                   # medical_records
-    Command.php                         # commands
     ActivityLog.php                     # activity_log
-    Comment.php                         # comments
+    Instruction.php                     # instructions
+    NakesDeviceConfig.php               # nakes_device_configs
   Services/
     AuthService.php                     # Login, logout, reset password
     DeviceService.php                   # Sensor data CRUD + caching
     UserService.php                     # User CRUD
+    InstructionService.php              # Instruksi dokter-nakes business logic
+    SensorService.php                   # Sensor data operations + caching + broadcast
+    PatientMonitoringService.php        # Integrasi ML API (Hugging Face)
+  Events/
+    InstructionSent.php                 # Broadcast saat dokter kirim instruksi
+    InstructionStatusUpdated.php        # Broadcast saat nakes selesaikan instruksi
+    InstructionReportSubmitted.php      # Broadcast saat nakes submit laporan
+    DeviceStatusChanged.php             # Broadcast saat device online/offline
+    SensorDataReceived.php              # Broadcast saat data sensor masuk
+  Jobs/
+    ProcessDeviceData.php               # Queue: proses system status device
+    ProcessSensorData.php               # Queue: proses sensor data
 database/
-  migrations/                           # 12 file migrasi
+  migrations/                           # 11 file migrasi
   seeders/
     DatabaseSeeder.php                  # Memanggil UserSeeder + DeviceSeeder
     UserSeeder.php                      # 3 akun (superadmin, dokter, nakes)
@@ -69,7 +85,7 @@ simulasi_py/
 
 ## Database Schema
 
-### Tabel Utama (9 tabel domain)
+### Tabel Utama (8 tabel domain)
 
 | Tabel | Primary Key | Keterangan |
 |-------|-------------|------------|
@@ -80,9 +96,8 @@ simulasi_py/
 | `api_keys` | id (auto-increment) | API key untuk autentikasi device |
 | `patients` | id (auto-increment) | Data pasien |
 | `medical_records` | id (auto-increment) | Rekam medis pasien |
-| `commands` | id (auto-increment) | Perintah start/stop ke device |
 | `activity_log` | id (auto-increment) | Log aktivitas sistem |
-| `comments` | id (auto-increment) | Komentar instruksi dokter ke nakes |
+| `instructions` | id (auto-increment) | Instruksi dokter-nakes + laporan nakes |
 
 > Detail lengkap: [DATABASE.md](DATABASE.md)
 
@@ -113,25 +128,34 @@ simulasi_py/
 | POST | `/api/device/{id}/authenticate` | Autentikasi device |
 | GET | `/api/device/{id}/config` | Konfigurasi device (hardcoded) |
 | POST | `/api/device/{id}/sensor-data` | Kirim data sensor |
-| POST | `/api/device/{id}/system-status` | Kirim status sistem |
 | GET | `/api/device/{id}/system-status` | Ambil status sistem |
+| POST | `/api/device/{id}/system-status` | Kirim status sistem |
+
+### Device Status API (Public, no auth)
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| GET | `/api/device/{id}/status` | Cek status device (untuk simulator) |
+
+### Instruction API (Session Auth)
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| GET | `/api/instruction` | Ambil instruksi per device |
+| POST | `/api/instruction` | Kirim instruksi (dokter) |
+| POST | `/api/instruction/report` | Submit laporan (nakes) |
+| PATCH | `/api/instruction/{id}` | Update instruksi (dokter) |
+| PATCH | `/api/instruction/{id}/complete` | Selesaikan instruksi (nakes) |
 
 ### Dashboard API (Session Auth)
 
 | Method | Endpoint | Keterangan |
 |--------|----------|------------|
-| GET | `/api/device/{id}/sensor-data/latest` | Data sensor terbaru |
-| GET | `/api/device/{id}/sensor-data/history` | Riwayat sensor (10 menit) |
-| GET | `/api/devices` | Daftar semua perangkat |
-| GET | `/api/comments` | Komentar per device |
-| POST | `/api/comments` | Kirim komentar |
-| PATCH | `/api/comments/{id}/respond` | Respon komentar |
-
-### Legacy
-
-| Method | Endpoint | Keterangan |
-|--------|----------|------------|
-| GET | `/api/sensor-data/{id}/latest` | Data sensor terbaru (legacy) |
+| GET | `/api/devices` | Daftar semua perangkat + data card + history grafik |
+| GET | `/api/device/{id}/sensor-data/latest` | Data sensor terbaru (session auth) |
+| GET | `/api/device/{id}/sensor-data/history` | Riwayat sensor (session auth) |
+| GET | `/api/device/{id}/prediction` | Prediksi ML untuk device |
+| PATCH | `/nakes/device-status` | Toggle device online/offline (nakes) |
 
 ---
 
@@ -156,6 +180,19 @@ simulasi_py/
 - `createUser(array)` — Buat user baru
 - `updateUser(User, array)` — Update user
 - `deleteUser(User)` — Hapus user
+
+### InstructionService
+- `getInstructions(string)` — Ambil instruksi per device (dengan relasi dokter/nakes)
+- `storeInstruction(array)` — Buat instruksi baru (dokter), broadcast `InstructionSent`
+- `completeInstruction(Instruction, string)` — Selesaikan instruksi (nakes), broadcast `InstructionStatusUpdated`
+- `updateInstruction(Instruction, array)` — Update instruksi (dokter), broadcast `InstructionSent`
+- `storeReport(array)` — Submit laporan nakes, broadcast `InstructionReportSubmitted`
+
+### SensorService
+- `storeSensorData(array)` — Simpan data sensor + update device status + broadcast + trigger ML
+- `getLatestSensorData(string)` — Ambil data terakhir (cache 5 menit)
+- `triggerPredictionIfNeeded(string)` — Trigger prediksi ML setiap 5 data baru (patokan: `ml_predicted_at`)
+- `runPrediction(string)` — Jalankan ML prediction, simpan hasil + probabilities, broadcast ulang
 
 ---
 
@@ -196,12 +233,12 @@ python simulator.py
   - Redirect berdasarkan role
 
 - [x] **Database & Migrasi**
-  - 12 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, commands, activity_log, comments, cache, jobs)
+  - 11 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, activity_log, instructions, cache, jobs)
   - ERD dan relasi lengkap
   - Seeder: 3 user + 2 device + 2 API key
 
 - [x] **Model Eloquent**
-  - 10 model: User, Devices, SensorData, SystemStatus, ApiKey, Patient, MedicalRecord, Command, ActivityLog, Comment
+  - 9 model: User, Devices, SensorData, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction
   - Relasi sudah didefinisikan
   - Scope dan accessor pada SensorData
 
@@ -211,10 +248,13 @@ python simulator.py
   - GET sensor data history (untuk chart)
   - GET system status
 
-- [x] **API Komentar**
-  - GET komentar per device
-  - POST komentar baru (dokter)
-  - PATCH respon komentar (nakes)
+- [x] **API Instruksi**
+  - GET instruksi per device
+  - POST instruksi baru (dokter)
+  - POST laporan nakes
+  - PATCH update instruksi (dokter)
+  - PATCH selesaikan instruksi (nakes)
+  - Broadcasting events (InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted)
 
 - [x] **Manajemen Alat (Superadmin)**
   - CRUD perangkat: tambah, detail, hapus
@@ -229,6 +269,17 @@ python simulator.py
   - DeviceService (sensor data + caching)
   - AuthService (login, logout, reset password)
   - UserService (CRUD user)
+  - InstructionService (instruksi dokter-nakes + broadcasting)
+  - SensorService (sensor data operations + caching)
+
+- [x] **Events & Jobs**
+  - InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted (broadcasting)
+  - ProcessDeviceData, ProcessSensorData (queue processing)
+
+- [x] **Queue & Broadcasting**
+  - Redis (predis/predis v3.4) untuk queue
+  - Laravel Reverb v1.0 untuk WebSocket broadcasting
+  - Database queue driver
 
 - [x] **Form Request Validation**
   - 7 form request class untuk validasi input
@@ -243,6 +294,41 @@ python simulator.py
   - Fix komentar checklist reset: preserve checked state saat poll
   - Fix polling interval: seragam 5 detik (sebelumnya 2s/10s tidak konsisten)
   - Fix device list: polling `/api/devices` setiap 10 detik
+
+- [x] **Realtime Updates (17 Mei 2026)**
+  - Hapus polling dari nakes & dokter dashboard (ganti WebSocket)
+  - `DeviceStatusChanged` event → broadcast saat device online/offline
+  - `SensorDataReceived` event → broadcast data card + history grafik sekaligus
+  - Card dan grafik selalu sinkron (satu event update keduanya)
+  - Zero delay: nakes toggle → dokter langsung update, simulator langsung stop
+
+- [x] **Device Status Toggle**
+  - Nakes bisa aktifkan/matikan perangkat dari dashboard
+  - Tombol "Aktifkan Perangkat" / "Matikan Perangkat" (optimistic update)
+  - Simulator cek status via thread monitor terpisah (zero delay)
+  - Superadmin manajemen-alat auto-update status (WebSocket)
+
+- [x] **Multi-Device Simulator**
+  - 3 device paralel dengan profile berbeda (normal/warning/critical)
+  - Konfigurasi dari `devices.json`
+  - Thread monitor: status berubah → simulator langsung stop/start
+
+- [x] **API Key Pendek**
+  - Format: `sats_` + 8 karakter random (total 13 karakter)
+  - Lebih mudah dicatat untuk demo
+
+- [x] **Machine Learning Integration**
+  - Prediksi dari 3 vital sign: HR, SpO2, Temperature
+  - API Hugging Face Spaces (Gradio async 2-step)
+  - Hasil disimpan di tabel `devices` (persisten): `ml_prediction`, `ml_condition`, `ml_risk_level`, `ml_probabilities`, `ml_predicted_at`
+  - Trigger setiap 5 data baru (patokan: `ml_predicted_at`, bukan `updated_at`)
+  - Probabilitas (Membaik/Stabil/Memburuk %) disimpan sebagai JSON di `ml_probabilities`
+  - Broadcast ulang ke dashboard setelah prediksi selesai
+  - Broadcast failure tidak mematikan queue job (try-catch)
+
+- [x] **Endpoint `/api/devices` Gabungan**
+  - Return data card (latest) + data grafik (history 10 menit) dalam satu response
+  - Parameter `?minutes=N` untuk rentang waktu grafik
 
 ### Belum Dikerjakan
 
@@ -264,11 +350,6 @@ python simulator.py
   - `getDeviceConfig()` masih hardcoded
   - Perlu baca dari database
 
-- [ ] **Commands (Start/Stop Device)**
-  - Model dan migrasi sudah ada
-  - Belum ada controller dan route
-  - Belum ada UI untuk kirim perintah
-
 - [ ] **Activity Log**
   - Model dan migrasi sudah ada
   - Belum ada yang menulis ke tabel ini
@@ -279,24 +360,19 @@ python simulator.py
   - Perlu testing dengan hardware asli
   - Konfigurasi MQTT/HTTP pada device
 
-- [ ] **Machine Learning**
-  - Prediksi kondisi pasien
-  - Endpoint `/api/device/{id}/prediction`
-  - Integrasi model ML ke pipeline data
-
 ---
 
 ## Rencana Perbaikan (Prioritas)
 
-### 1. Realtime & Delay Fix
-- Kurangi delay pengiriman data simulator ke dashboard
-- Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif polling
-- Hapus atau kurangi cache TTL pada DeviceService (saat ini 5 menit)
+### 1. ~~Realtime & Delay Fix~~ (Selesai 17 Mei 2026)
+- ~~Kurangi delay pengiriman data simulator ke dashboard~~
+- ~~Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif polling~~ → WebSocket (Reverb)
+- ~~Hapus atau kurangi cache TTL pada DeviceService (saat ini 5 menit)~~
 
-### 2. Notifikasi Komentar
-- Notifikasi "Komentar terkirim" saat dokter mengirim komentar
-- Warning/highlight saat komentar dichecklist nakes
-- Badge counter komentar aktif di sidebar
+### 2. Notifikasi Instruksi
+- Notifikasi "Instruksi terkirim" saat dokter mengirim instruksi
+- Warning/highlight saat instruksi diselesaikan nakes
+- Badge counter instruksi aktif di sidebar
 
 ### 3. Backend Laporan
 - Aktifkan query database di LaporanController
@@ -307,20 +383,25 @@ python simulator.py
 - Daftarkan route untuk UserController
 - Hubungkan ke halaman manajemen-user
 
-### 5. Commands & Activity Log
-- Buat controller untuk commands (start/stop device)
+### 5. Activity Log
 - Buat activity logging di setiap aksi penting
+- Model dan migrasi sudah ada
 
 ---
 
 ## Notes
 
-- Komentar endpoint ada di `web.php` (session auth), bukan `api.php` — disengaja karena diakses dari dashboard frontend
+- Instruction endpoint ada di `api.php` dengan middleware `web` + `auth` (session auth)
 - `UserController` punya method tapi belum ada route di `web.php`
 - `LaporanController` dan `SuperadminLaporanController` masih pakai dummy data
-- `DeviceAuthController@getDeviceConfig` mengembalikan nilai hardcoded
-- Cache DeviceService: sensor data 5 menit, system status 2 menit — cleared on write
+- `DeviceDataController@getDeviceConfig` mengembalikan nilai hardcoded
+- Cache SensorService: cleared on write (broadcast menggantikan polling)
+- System status menggunakan queue (`ProcessDeviceData`) untuk async processing
+- Broadcasting via Reverb: 5 event (3 instruksi + 2 realtime dashboard)
+- Endpoint `/api/devices` return data gabungan: card + grafik dalam satu response
+- ML prediction disimpan di tabel `devices` (bukan `sensor_datas`)
+- Simulator pakai `threading.Event` untuk zero-delay stop saat device dimatikan
 
 ---
 
-*Last updated: 10 Mei 2026*
+*Last updated: 18 Mei 2026*

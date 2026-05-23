@@ -27,15 +27,17 @@ resources/views/
       forgot-password.blade.php
       reset-password.blade.php
     nakes/
-      dashboard.blade.php     # Monitoring device (chart, vital sign, prediksi ML, respon komentar)
+      dashboard.blade.php     # Monitoring device (chart, vital sign, prediksi ML)
       inputdata.blade.php     # Form input data pasien (belum ada backend)
       laporan.blade.php       # Laporan medis + chart + filter tanggal
       laporan-pdf.blade.php   # Template PDF laporan (DomPDF compatible)
+      instruksi.blade.php     # Chat instruksi dokter + laporan nakes (API-connected)
     dokter/
-      dashboard.blade.php     # Monitoring device + container komentar untuk nakes
+      dashboard.blade.php     # Monitoring device (chart, vital sign)
       inputdata.blade.php     # Form input data pasien (sama seperti nakes)
       laporan.blade.php       # Laporan medis (sama seperti nakes, role-aware)
       laporan-pdf.blade.php   # Template PDF (sama seperti nakes, role-aware)
+      instruksi.blade.php     # Chat instruksi medis + pantau laporan nakes (API-connected)
     superadmin/
       dashboard.blade.php     # Dashboard superadmin (stat cards, tabel kritis, log)
       manajemen-alat.blade.php # Inventaris alat + modal tambah & detail alat
@@ -77,6 +79,7 @@ resources/views/
 | GET    | `/nakes/input-data-pasien`| `input-data-pasien`|
 | GET    | `/nakes/laporan`         | `laporan.index`    |
 | GET    | `/nakes/laporan/pdf`     | `laporan.pdf`      |
+| GET    | `/nakes/instruksi`       | `nakes.instruksi`  |
 
 ### Dokter (auth + role:dokter)
 | Method | URI                       | Name                    |
@@ -85,6 +88,7 @@ resources/views/
 | GET    | `/dokter/input-data-pasien`| `dokter.input-data-pasien`|
 | GET    | `/dokter/laporan`         | `dokter.laporan`        |
 | GET    | `/dokter/laporan/pdf`     | `dokter.laporan.pdf`    |
+| GET    | `/dokter/instruksi`       | `dokter.instruksi`      |
 
 ### Superadmin (auth + role:superadmin)
 | Method | URI                            | Name                        |
@@ -104,14 +108,17 @@ resources/views/
 - [x] Halaman login + image slider
 - [x] Sistem auth (login, logout, forgot/reset password)
 - [x] Role middleware (nakes, dokter, superadmin)
-- [x] Dashboard nakes (terhubung ke API real, polling sensor data + komentar)
+- [x] Dashboard nakes (realtime via WebSocket, zero polling)
 - [x] Input data pasien nakes (UI form, belum ada backend POST)
 - [x] Laporan nakes (HTML + PDF, data dummy)
-- [x] Navbar & sidebar nakes
-- [x] Dashboard dokter (terhubung ke API real, polling sensor data + komentar)
+- [x] Navbar & sidebar nakes (termasuk menu Instruksi)
+- [x] Dashboard dokter (realtime via WebSocket, zero polling)
 - [x] Input data pasien dokter (UI form, sama seperti nakes)
 - [x] Laporan dokter (HTML + PDF, role-aware via LaporanController)
-- [x] Fitur komentar dokter→nakes (terhubung ke API CommentController)
+- [x] Halaman instruksi nakes (chat-style, laporan + konfirmasi instruksi dokter)
+- [x] Halaman instruksi dokter (chat-style, instruksi medis + pantau laporan nakes)
+- [x] Fitur instruksi dokter→nakes (terhubung ke API InstructionController)
+- [x] Fitur laporan nakes→dokter (submit laporan kejadian)
 - [x] Fitur respon nakes (dropdown 5 opsi respon + checklist instruksi)
 - [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas)
 - [x] Sidebar dinamis (nakes/dokter/superadmin)
@@ -122,48 +129,61 @@ resources/views/
 - [x] Seeder user dengan 3 role (`UserSeeder.php`)
 - [x] Auth redirect berdasarkan role (termasuk dokter)
 - [x] Bug fix: chart flickering (skip update jika data sama)
-- [x] Bug fix: komentar checklist reset (preserve state saat poll)
 - [x] Bug fix: polling interval seragam (5 detik)
 - [x] Fitur: dropdown device auto-update tanpa refresh
+- [x] Realtime updates via WebSocket (Reverb) — hapus semua polling dashboard
+- [x] Device status toggle (nakes: aktifkan/matikan perangkat)
+- [x] Optimistic update tombol toggle (langsung berubah, revert kalau gagal)
+- [x] Card + grafik sinkron (satu WebSocket event update keduanya)
+- [x] Dokter dashboard auto-kosong saat device offline
+- [x] `updateCharts(history)` — terima data langsung, bukan fetch terpisah
+- [x] ML prediction card di dashboard nakes/dokter
+- [x] Probability card di dashboard nakes/dokter (Membaik/Stabil/Memburuk % dengan progress bar)
+- [x] Chart.js initialization (HR, SpO2, Temperature)
+- [x] Superadmin manajemen-alat: polling auto-refresh device status
 
 ### Belum Dikerjakan
 - [ ] Backend untuk input data pasien (POST route + controller)
 - [ ] Route untuk UserController (CRUD user belum terhubung ke UI)
 - [ ] Laporan dari database (masih dummy data)
 - [ ] Integrasi IoT real (simulator sudah ada, hardware belum)
-- [ ] Machine Learning (prediksi kondisi pasien)
-- [ ] Notifikasi komentar terkirim (toast/snackbar)
-- [ ] Warning/highlight saat komentar dichecklist nakes
+- [ ] Notifikasi instruksi terkirim (toast/snackbar)
+- [ ] Warning/highlight saat instruksi diselesaikan nakes
 
 ---
 
-## Fitur Komentar Dokter→Nakes
+## Fitur Instruksi Dokter→Nakes
 
 ### Alur:
-1. **Dokter** mengirim komentar/instruksi dari dashboard (textarea + tombol Kirim)
-2. **Nakes** melihat instruksi di dashboard dengan opsi respon (dropdown):
+1. **Dokter** mengirim instruksi medis dari halaman instruksi (textarea + tombol Kirim)
+2. **Nakes** melihat instruksi di halaman instruksi dengan opsi respon (dropdown):
    - Sudah dilakukan
    - Tidak bisa dilakukan
    - Tidak memungkinkan
    - Sedang diproses
    - Butuh konfirmasi ulang
-3. Nakes bisa checklist instruksi yang sudah selesai (disembunyikan dari daftar aktif)
-4. Dokter melihat respon nakes di bawah komentarnya (green border styling)
+3. **Nakes** bisa mengirim laporan kejadian ke dokter
+4. Nakes bisa checklist instruksi yang sudah selesai (disembunyikan dari daftar aktif)
+5. Dokter melihat respon nakes dan laporan di halaman instruksi (chat-style layout)
 
 ### Implementasi:
-- Menggunakan Alpine.js (`komentarDokter()` dan `komentarNakes()`)
-- **Terhubung ke API:** GET/POST `/api/comments`, PATCH `/api/comments/{id}/respond`
-- Polling komentar setiap 5 detik
-- State checklist nakes di-preserve saat polling (menggunakan `_checkedIds` Set)
-- Dokter melihat respon nakes secara realtime
+- Menggunakan Alpine.js (`instruksiDokter()` dan `instruksiNakes()`)
+- **Terhubung ke API:** GET/POST `/api/instruction`, PATCH `/api/instruction/{id}/complete`, POST `/api/instruction/report`
+- Polling instruksi setiap 5 detik
+- State checklist nakes di-preserve saat polling
+- Chat-style layout dengan scroll otomatis
+- Broadcasting events: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
 
 ---
 
 ## Notes
 
-- Dashboard nakes & dokter **terhubung ke API real** (polling 5 detik)
-- Dropdown device **auto-update** tanpa refresh halaman (polling `/api/devices` 10 detik)
+- Dashboard nakes & dokter **realtime via WebSocket** (Reverb, zero polling)
+- Nakes dashboard: subscribe `device.{deviceId}` untuk status + sensor events
+- Dokter dashboard: subscribe semua device channels untuk status + sensor events
+- Superadmin manajemen-alat: polling `/api/devices` setiap 3 detik (satu-satunya polling)
 - Sidebar `components/sidebar.blade.php` sudah dinamis berdasarkan role (nakes/dokter/superadmin)
+- Menu Instruksi tersedia di sidebar nakes dan dokter
 - Navbar menampilkan nama user + role (dengan `ucfirst()`)
 - `LaporanController` sudah role-aware: cek `auth()->user()->role` untuk pilih view folder
 - `DashboardController` sudah support 3 role di `getViewByRole()`
@@ -172,3 +192,5 @@ resources/views/
 - Manajemen user: UI ada, backend ada, route belum didaftarkan
 - Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)
 - Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware
+- `updateCharts()` di kedua dashboard menerima data langsung (bukan fetch terpisah)
+- `toggleDevice()` pakai optimistic update (langsung berubah, revert kalau gagal)

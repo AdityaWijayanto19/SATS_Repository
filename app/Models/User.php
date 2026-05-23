@@ -40,4 +40,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Patient::class, 'nakes_id');
     }
+
+    public function deviceConfig()
+    {
+        return $this->hasOne(NakesDeviceConfig::class, 'user_id');
+    }
 }

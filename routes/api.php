@@ -1,70 +1,49 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\DeviceAuthController;
+use App\Http\Controllers\Api\DeviceDataController;
 use App\Http\Controllers\Api\SensorDataController;
+use App\Http\Controllers\Api\InstructionController;
 
-/**
- * Health check endpoint
- */
-Route::get('/', function () {
-    return response()->json([
-        'message' => 'API SATS running',
-        'version' => '1.0.0',
-        'timestamp' => now(),
-    ]);
-});
+// Device endpoints
+Route::post('/device/{device_id}/authenticate', [DeviceDataController::class, 'authenticate'])->middleware('apikey');
+Route::get('/device/{device_id}/status', [DeviceDataController::class, 'getDeviceStatus']);
 
-/**
- * Device Authenticate Endpoint (Public, requires API key only)
- * POST /api/device/{device_id}/authenticate
- */
-Route::post('/device/{device_id}/authenticate', [DeviceAuthController::class, 'authenticate'])->middleware('apikey');
+// Device onboarding endpoint (unprotected initially)
+Route::post('/device/register', [DeviceDataController::class, 'registerDevice']);
 
-/**
- * Device Communication Routes (Protected)
- *
- * All endpoints:
- * - Require X-API-Key header
- * - Require device_id in route parameter
- * - Optimized for minimal DB queries & caching
- */
-Route::prefix('device')->middleware('apikey')->group(function () {
+Route::prefix('device')->middleware(['apikey', 'throttle.api', /* 'sign.verify' */])->group(function () {
 
-    /**
-     * Get device configuration
-     * GET /api/device/{device_id}/config
-     */
-    Route::get('/{device_id}/config', [DeviceAuthController::class, 'getDeviceConfig']);
+    Route::get('/{device_id}/config', [DeviceDataController::class, 'getDeviceConfig'])/* ->withoutMiddleware('sign.verify') */;
 
-    /**
-     * Sensor Data Endpoints
-     */
     Route::prefix('/{device_id}/sensor-data')->group(function () {
-        // Store sensor data dari device
-        Route::post('', [DeviceAuthController::class, 'storeSensorData']);
+        Route::post('', [SensorDataController::class, 'storeSensorData'])->middleware('idempotent');
+        Route::post('/batch', [SensorDataController::class, 'storeSensorDataBatch'])->middleware('idempotent');
     });
 
-    /**
-     * System Status Endpoints
-     */
     Route::prefix('/{device_id}/system-status')->group(function () {
-        // Store system status (battery, signal)
-        Route::post('/', [DeviceAuthController::class, 'storeSystemStatus']);
-
-        // Get system status (cached)
-        Route::get('/', [DeviceAuthController::class, 'getSystemStatus']);
+        Route::post('/', [DeviceDataController::class, 'storeSystemStatus'])->middleware('idempotent');
     });
 });
 
-/**
- * Legacy SensorData endpoint (for backward compatibility)
- * GET /api/sensor-data/{device_id}/latest
- */
-Route::get('/sensor-data/{device_id}/latest', [SensorDataController::class, 'latest']);
+Route::middleware(['web'])->group(function () {
+    // Monitoring endpoints - accept both session auth (dokter) and API Key (nakes)
+    Route::middleware('monitoring.auth')->group(function () {
+        Route::get('/device', [DeviceDataController::class, 'listDevices']);
+        Route::get('/device/{device_id}/sensor-data/latest', [SensorDataController::class, 'getLatestSensorData']);
+        Route::get('/device/{device_id}/sensor-data/history', [SensorDataController::class, 'getSensorDataHistory']);
+    });
 
-/**
- * Sensor data endpoints for dashboard (no API key needed, session auth)
- */
-Route::get('/device/{device_id}/sensor-data/latest', [DeviceAuthController::class, 'getLatestSensorData']);
-Route::get('/device/{device_id}/sensor-data/history', [DeviceAuthController::class, 'getSensorDataHistory']);
+    // Endpoint prediksi ML (session auth, dipanggil dashboard frontend)
+    Route::middleware('auth')->group(function () {
+        Route::get('/device/{device}/prediction', [SensorDataController::class, 'getPrediction']);
+
+        Route::prefix('instruction')->group(function () {
+            Route::get('', [InstructionController::class, 'index']);
+            Route::post('', [InstructionController::class, 'store']);
+            Route::post('/report', [InstructionController::class, 'storeReport']);
+            Route::patch('/{instruction}', [InstructionController::class, 'update']);
+            Route::patch('/{instruction}/complete', [InstructionController::class, 'complete']);
+        });
+    });
+});

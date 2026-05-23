@@ -1,5 +1,7 @@
 /.phpunit.cache
 /node_modules
+__pycache__/
+*.pyc
 /public/build
 /public/hot
 /public/storage
@@ -21,3 +23,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+simulasi_py/devices.json
+.claude/
+dump.rdb
+redis_server/

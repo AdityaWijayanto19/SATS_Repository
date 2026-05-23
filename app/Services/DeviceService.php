@@ -17,52 +17,13 @@ class DeviceService
 
     public function __construct()
     {
-        $this->cache = Cache::store('file'); // Fast local cache
+        $this->cache = Cache::store('redis');
     }
 
-    public function storeSensorData(array $data): SensorData
-    {
-        Log::info('Service: mulai store sensor data', $data);
-        // Bulk update device status (more efficient than separate update)
-        Devices::where('device_id', $data['device_id'])
-            ->update([
-                'status' => 'online',
-                'last_seen' => Carbon::now(),
-            ]);
-
-        // Insert sensor data
-        $sensorData = SensorData::create($data);
-
-        Log::info('Service: data berhasil disimpan', [
-            'id' => $sensorData->id
-        ]);
-
-        // Clear cache untuk latest data device ini
-        $this->clearLatestDataCache($data['device_id']);
-
-        return $sensorData;
-    }
-
-    public function getLatestSensorData(string $deviceId): ?SensorData
-    {
-        $cacheKey = "latest_sensor_{$deviceId}";
-
-        return $this->cache->remember(
-            $cacheKey,
-            300, // 5 minutes
-            fn() => SensorData::onlyVitals()
-                ->where('device_id', $deviceId)
-                ->latest('created_at')
-                ->first()
-        );
-    }
-
-    /**
-     * Store system status (battery, signal)
-     * Performance: Single upsert query
-     */
     public function storeSystemStatus(array $data): SystemStatus
     {
+        Log::debug('Service: storeSystemStatus', $data);
+
         $status = SystemStatus::updateOrCreate(
             ['device_id' => $data['device_id']],
             [
@@ -73,16 +34,18 @@ class DeviceService
             ]
         );
 
-        // Clear cache
+        Log::channel('device-audit')->info('System status stored', [
+            'device_id' => $data['device_id'],
+            'monitoring_status' => $data['monitoring_status'],
+            'battery_level' => $data['battery_level'],
+            'signal_strength' => $data['signal_strength'],
+        ]);
+
         $this->clearSystemStatusCache($data['device_id']);
 
         return $status;
     }
 
-    /**
-     * Get system status dengan caching
-     * Performance: Cache 2 menit
-     */
     public function getSystemStatus(string $deviceId): ?SystemStatus
     {
         $cacheKey = "system_status_{$deviceId}";
@@ -95,11 +58,7 @@ class DeviceService
         );
     }
 
-    /**
-     * Get device detail dengan relationships (minimal select)
-     * Performance: Select only needed columns, single query
-     */
-    public function getDeviceDetail(string $deviceId)
+    public function getDeviceDetail($deviceId)
     {
         return Devices::select('device_id', 'status', 'last_seen', 'created_at')
             ->with([
@@ -110,17 +69,6 @@ class DeviceService
             ->first();
     }
 
-    /**
-     * Clear latest data cache
-     */
-    protected function clearLatestDataCache(string $deviceId): void
-    {
-        $this->cache->forget("latest_sensor_{$deviceId}");
-    }
-
-    /**
-     * Clear system status cache
-     */
     protected function clearSystemStatusCache(string $deviceId): void
     {
         $this->cache->forget("system_status_{$deviceId}");
