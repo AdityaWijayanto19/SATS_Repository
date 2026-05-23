@@ -61,12 +61,15 @@ Laporan Medis + PDF
 - Zero polling — menggunakan **Laravel Reverb WebSocket**
 - Card dan grafik selalu sinkron (satu event update keduanya)
 - Toggle device online/offline dari dashboard nakes
+- **Chart toggle:** mode terpisah (3 chart) atau gabungan (1 chart, 3 Y-axis)
 
 ### Sistem Instruksi Dokter-Nakes
 - Dokter mengirim instruksi medis dari dashboard
-- Nakes merespon dengan dropdown opsi + checklist
+- Nakes merespon dengan 9 quick reply buttons
 - Real-time via WebSocket broadcasting
 - Floating chat widget di pojok kanan bawah
+- Chat alignment: pesan sendiri di kanan, pesan lawan di kiri
+- Foto profil sebagai avatar chat
 
 ### Machine Learning
 - Prediksi kondisi pasien: **Normal / Warning / Critical**
@@ -83,6 +86,11 @@ Laporan Medis + PDF
 - Laporan medis dengan chart dan filter tanggal
 - Download PDF via DomPDF + QuickChart.io
 - Role-aware (nakes, dokter, superadmin)
+
+### Profil & Landing Page
+- Edit profil: nama, email, password, foto avatar (4 pilihan per role)
+- Landing page publik dengan 7 section (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
+- Sidebar logo navigasi kembali ke landing page
 
 ---
 
@@ -152,11 +160,12 @@ php artisan key:generate
 # 6. Jalankan migrasi & seeder
 php artisan migrate --seed
 
-# 7. Jalankan development server (4 terminal)
-npm run dev                    # Terminal 1: Vite
-php artisan serve              # Terminal 2: Laravel
-php artisan queue:work         # Terminal 3: Queue worker
-php artisan reverb:start       # Terminal 4: WebSocket server
+# 7. Jalankan development server (5 terminal)
+npm run dev                                              # Terminal 1: Vite
+php artisan serve                                        # Terminal 2: Laravel
+redis_server/redis-server.exe redis_server/redis.windows.conf  # Terminal 3: Redis
+php artisan queue:work                                   # Terminal 4: Queue worker
+php artisan reverb:start                                 # Terminal 5: WebSocket server
 ```
 
 ### Jalankan Simulator (Opsional)
@@ -191,9 +200,11 @@ app/
 └── Middleware/                 # Auth, API key, rate limit
 
 resources/views/
-├── components/                # Navbar, Sidebar, Chat Widget
-├── layouts/                   # App & Auth layouts
+├── components/                # Navbar, Sidebar, Chat Widget, Profile Dropdown
+├── layouts/                   # App, Auth, Landing layouts
 └── pages/
+    ├── landing/               # 7 sections (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
+    ├── profile/               # Edit profil
     ├── nakes/                 # Dashboard, Input, Laporan, Instruksi
     ├── dokter/                # Dashboard, Input, Laporan, Instruksi
     └── superadmin/            # Dashboard, Alat, User, Laporan
@@ -253,6 +264,7 @@ Dokumentasi API lengkap: [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 | Dashboard tidak update | Pastikan `php artisan reverb:start` + `queue:work` berjalan |
 | ML prediction tidak muncul | Pastikan `queue:work` berjalan, cek log |
 | Simulator error | `pip install -r requirements.txt` di folder `simulasi_py/` |
+| Simulator `Connection refused` (Redis) | Jalankan Redis: `redis_server/redis-server.exe redis_server/redis.windows.conf` |
 
 ---
 

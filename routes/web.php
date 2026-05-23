@@ -8,6 +8,7 @@ use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ManajemenAlatController;
 use App\Http\Controllers\SuperadminLaporanController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ProfileController;
 
 Route::get('/', function () {
     return view('pages.landing');
@@ -28,6 +29,10 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('
 Route::middleware(['auth'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    // Profile Routes (all roles)
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // Nakes Routes
     Route::prefix('nakes')->middleware('role:nakes')->group(function () {

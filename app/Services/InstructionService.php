@@ -15,20 +15,22 @@ class InstructionService
     {
         // Query ke tabel instructions berdasarkan device_id
         return Instruction::where('device_id', $device_id)
-            ->with(['dokter:id,name', 'nakes:id,name', 'creator:id,name'])
+            ->with(['dokter:id,name,photo', 'nakes:id,name,photo', 'creator:id,name,photo'])
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($item) {
                 return [
                     'id'              => $item->id,
-                    'instruksi_dokter' => $item->instruksi_dokter, // Updated column name
+                    'instruksi_dokter' => $item->instruksi_dokter,
                     'is_completed'    => (bool) $item->is_completed,
                     'user_name'       => $item->dokter?->name ?? $item->creator?->name ?? 'Dokter SATS',
+                    'user_photo'      => $item->dokter?->photo ?? $item->creator?->photo ?? null,
                     'nakes_name'      => $item->nakes?->name ?? 'Nakes SATS',
+                    'nakes_photo'     => $item->nakes?->photo ?? null,
                     'waktu'           => $item->created_at->setTimezone('Asia/Jakarta')->format('H:i'),
                     'completed_at'    => $item->completed_at ? $item->completed_at->setTimezone('Asia/Jakarta')->format('H:i') : null,
                     'completed_by'    => $item->nakes?->name ?? '—',
-                    'respon_nakes'    => $item->respon_nakes, // Updated column name
+                    'respon_nakes'    => $item->respon_nakes,
                     'laporan_nakes'   => $item->laporan_nakes,
                 ];
             });
@@ -123,7 +125,6 @@ class InstructionService
     }
 
     private function formatSingleInstruction($item)
-
     {
         $currentUser = Auth::user();
         return [
@@ -131,7 +132,9 @@ class InstructionService
             'instruksi_dokter' => $item->instruksi_dokter,
             'is_completed'    => (bool) $item->is_completed,
             'user_name'        => $item->dokter?->name ?? ($item->instruksi_dokter ? $currentUser->name : 'Dokter SATS'),
+            'user_photo'       => $item->dokter?->photo ?? ($item->instruksi_dokter ? $currentUser->photo : null),
             'nakes_name'       => $item->nakes?->name ?? ($item->laporan_nakes ? $currentUser->name : 'Nakes SATS'),
+            'nakes_photo'      => $item->nakes?->photo ?? ($item->laporan_nakes ? $currentUser->photo : null),
             'waktu'           => now()->setTimezone('Asia/Jakarta')->format('H:i'),
             'completed_at'    => $item->completed_at ? $item->completed_at->setTimezone('Asia/Jakarta')->format('H:i') : null,
             'respon_nakes'    => $item->respon_nakes,

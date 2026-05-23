@@ -23,14 +23,14 @@
     {{-- Header --}}
     <div class="flex items-center h-18 pl-5 px-4 flex-shrink-0" :class="sidebarOpen ? 'justify-between' : 'justify-center'">
         {{-- Logo --}}
-        <div x-show="sidebarOpen" style="display: none;" class="flex items-center gap-2 overflow-hidden">
+        <a href="{{ url('/') }}" x-show="sidebarOpen" style="display: none;" class="flex items-center gap-2 overflow-hidden hover:opacity-80 transition-opacity">
             <!-- <img src="{{ asset('assets/logo.png') }}" class="w-10 h-10 object-contain flex-shrink-0"> -->
             <span class="text-white font-semibold text-base whitespace-nowrap">SATS <br>
                 <span class="text-xs font-normal">
                     Monitoring Sidebar
                 </span>
             </span>
-        </div>
+        </a>
 
         {{-- Toggle Button --}}
         <button

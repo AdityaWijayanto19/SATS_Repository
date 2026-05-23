@@ -17,33 +17,53 @@
 resources/views/
   components/
     navbar.blade.php          # Top nav (logo, user name + role, logout)
-    sidebar.blade.php         # Sidebar dinamis (nakes/dokter/superadmin)
+    sidebar.blade.php         # Sidebar dinamis (nakes/dokter/superadmin), logo → landing page
+    chat-widget.blade.php     # Floating chat widget (nakes & dokter dashboard)
+    landing-navbar.blade.php  # Navbar halaman landing (publik + auth)
+    landing-footer.blade.php  # Footer halaman landing
+    profile-dropdown.blade.php # Dropdown profil di navbar (edit profile, logout)
   layouts/
     app.blade.php             # Layout utama (navbar + sidebar + yield)
     auth.blade.php            # Layout halaman auth (login, forgot/reset password)
+    landing.blade.php         # Layout halaman landing page
   pages/
+    landing.blade.php         # Landing page (publik)
     login.blade.php           # Halaman login + image slider
     auth/
       forgot-password.blade.php
       reset-password.blade.php
+    profile/
+      edit.blade.php          # Edit profil (nama, email, password, foto avatar)
     nakes/
-      dashboard.blade.php     # Monitoring device (chart, vital sign, prediksi ML)
+      dashboard.blade.php     # Monitoring device (chart toggle terpisah/gabungan, vital sign, prediksi ML)
       inputdata.blade.php     # Form input data pasien (belum ada backend)
       laporan.blade.php       # Laporan medis + chart + filter tanggal
       laporan-pdf.blade.php   # Template PDF laporan (DomPDF compatible)
       instruksi.blade.php     # Chat instruksi dokter + laporan nakes (API-connected)
+      monitoring.blade.php    # Halaman monitoring
     dokter/
-      dashboard.blade.php     # Monitoring device (chart, vital sign)
+      dashboard.blade.php     # Monitoring device (chart toggle terpisah/gabungan, vital sign)
       inputdata.blade.php     # Form input data pasien (sama seperti nakes)
       laporan.blade.php       # Laporan medis (sama seperti nakes, role-aware)
       laporan-pdf.blade.php   # Template PDF (sama seperti nakes, role-aware)
       instruksi.blade.php     # Chat instruksi medis + pantau laporan nakes (API-connected)
+      monitoring.blade.php    # Halaman monitoring
+      monitor-3d.blade.php    # Monitoring 3D
     superadmin/
       dashboard.blade.php     # Dashboard superadmin (stat cards, tabel kritis, log)
       manajemen-alat.blade.php # Inventaris alat + modal tambah & detail alat
       manajemen-user.blade.php # Manajemen user + modal tambah & detail user
       laporan.blade.php       # Laporan superadmin (filter, stat cards, chart, tabel sensor)
       laporan-pdf.blade.php   # Template PDF laporan superadmin (landscape A4)
+    landing/
+      sections/
+        hero.blade.php        # Section hero/beranda
+        tentang.blade.php     # Section tentang SATS
+        fitur.blade.php       # Section fitur
+        alat.blade.php        # Section alat/perangkat
+        cara-kerja.blade.php  # Section cara kerja
+        faq.blade.php         # Section FAQ (accordion)
+        closing.blade.php     # Section CTA penutup
 ```
 
 ---
@@ -65,12 +85,19 @@ resources/views/
 ### Public
 | Method | URI                | Name               |
 |--------|--------------------|--------------------|
+| GET    | `/`                | (landing page)     |
 | GET    | `/login`           | `login`            |
 | POST   | `/login`           | `login.process`    |
 | GET    | `/forgot-password` | `password.forgot`  |
 | POST   | `/forgot-password` | `password.email`   |
 | GET    | `/reset-password`  | `password.reset`   |
 | POST   | `/reset-password`  | `password.update`  |
+
+### Profile (auth, semua role)
+| Method | URI              | Name            |
+|--------|------------------|-----------------|
+| GET    | `/profile/edit`  | `profile.edit`  |
+| PUT    | `/profile`       | `profile.update`|
 
 ### Nakes (auth + role:nakes)
 | Method | URI                      | Name               |
@@ -122,6 +149,7 @@ resources/views/
 - [x] Fitur respon nakes (dropdown 5 opsi respon + checklist instruksi)
 - [x] Dashboard superadmin (stat cards, tabel kritis, log aktivitas realtime)
 - [x] Sidebar dinamis (nakes/dokter/superadmin)
+- [x] Sidebar logo clickable → landing page
 - [x] Navbar menampilkan nama + role user
 - [x] Manajemen alat (CRUD terhubung ke backend, auto-generate API key)
 - [x] Manajemen user (tabel user + modal tambah & detail user)
@@ -140,7 +168,14 @@ resources/views/
 - [x] ML prediction card di dashboard nakes/dokter
 - [x] Probability card di dashboard nakes/dokter (Membaik/Stabil/Memburuk % dengan progress bar)
 - [x] Chart.js initialization (HR, SpO2, Temperature)
+- [x] Chart toggle terpisah/gabungan di dashboard nakes & dokter
 - [x] Superadmin manajemen-alat: polling auto-refresh device status
+- [x] Edit profil (nama, email, password, foto avatar per role)
+- [x] Floating chat widget (nakes & dokter dashboard)
+- [x] Chat: alignment pesan berdasarkan role (pesan sendiri = kanan, pesan lawan = kiri)
+- [x] Chat: foto profil pengganti inisial role (DR/NK → foto avatar)
+- [x] Landing page + 7 section (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
+- [x] Activity log realtime via WebSocket (PrivateChannel + Alpine double-init fix)
 
 ### Belum Dikerjakan
 - [ ] Backend untuk input data pasien (POST route + controller)
@@ -152,27 +187,25 @@ resources/views/
 
 ---
 
-## Fitur Instruksi Dokter→Nakes
+## Fitur Instruksi Dokter→Nakes (Floating Chat Widget)
 
 ### Alur:
-1. **Dokter** mengirim instruksi medis dari halaman instruksi (textarea + tombol Kirim)
-2. **Nakes** melihat instruksi di halaman instruksi dengan opsi respon (dropdown):
-   - Sudah dilakukan
-   - Tidak bisa dilakukan
-   - Tidak memungkinkan
-   - Sedang diproses
-   - Butuh konfirmasi ulang
-3. **Nakes** bisa mengirim laporan kejadian ke dokter
-4. Nakes bisa checklist instruksi yang sudah selesai (disembunyikan dari daftar aktif)
-5. Dokter melihat respon nakes dan laporan di halaman instruksi (chat-style layout)
+1. **Dokter** mengirim instruksi medis dari floating chat widget di dashboard
+2. **Nakes** melihat instruksi di floating chat widget dengan 9 quick reply buttons:
+   - Sudah dilakukan, Dalam proses, Alat tidak tersedia, Obat sudah diberikan,
+     Pasien stabil, Pasien kritis, Butuh bantuan, Gagal, Monitoring lanjutan
+3. **Nakes** bisa mengirim laporan kejadian ke dokter (free text)
+4. Nakes bisa konfirmasi instruksi yang sudah selesai
+5. Dokter melihat respon nakes dan laporan di chat widget (chat-style layout)
 
 ### Implementasi:
-- Menggunakan Alpine.js (`instruksiDokter()` dan `instruksiNakes()`)
+- Component: `resources/views/components/chat-widget.blade.php` (Alpine.js `chatWidget()`)
 - **Terhubung ke API:** GET/POST `/api/instruction`, PATCH `/api/instruction/{id}/complete`, POST `/api/instruction/report`
-- Polling instruksi setiap 5 detik
-- State checklist nakes di-preserve saat polling
-- Chat-style layout dengan scroll otomatis
+- Real-time via Laravel Reverb WebSocket (zero polling)
+- Chat alignment: pesan sendiri = kanan, pesan lawan = kiri (role-aware)
+- Avatar: foto profil user (dari tabel `users.photo`), fallback ke inisial role
 - Broadcasting events: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
+- Broadcast payload include `user_photo` dan `nakes_photo`
 
 ---
 
@@ -183,13 +216,14 @@ resources/views/
 - Dokter dashboard: subscribe semua device channels untuk status + sensor events
 - Superadmin manajemen-alat: polling `/api/devices` setiap 3 detik (satu-satunya polling)
 - Sidebar `components/sidebar.blade.php` sudah dinamis berdasarkan role (nakes/dokter/superadmin)
+- Sidebar logo clickable → landing page (`url('/')`)
 - Menu Instruksi tersedia di sidebar nakes dan dokter
 - Navbar menampilkan nama user + role (dengan `ucfirst()`)
 - `LaporanController` sudah role-aware: cek `auth()->user()->role` untuk pilih view folder
 - `DashboardController` sudah support 3 role di `getViewByRole()`
 - Form input data pasien belum punya backend handler
 - Manajemen alat: CRUD sudah terhubung ke backend
-- Manajemen user: UI ada, backend ada, route belum didaftarkan
+- Manajemen user: UI ada, backend ada, route terdaftar
 - Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)
 - Simulator Python tersedia di `simulasi_py/` untuk testing tanpa hardware
 - `updateCharts()` di kedua dashboard menerima data langsung (bukan fetch terpisah)
@@ -197,3 +231,10 @@ resources/views/
 - Superadmin activity log realtime via WebSocket (PrivateChannel `superadmin.dashboard`)
 - Alpine.js double-init issue: CDN `collapse` plugin + main Alpine bikin `init()` dipanggil 2x
 - Fix: `window._superadminRef` global reference + `window._superadminEchoBound` guard
+- Chart toggle di dashboard nakes & dokter: mode "Terspisah" (3 chart) dan "Gabungan" (1 chart, 3 Y-axis)
+- Floating chat widget: pesan sendiri di kanan, pesan lawan di kiri (role-aware)
+- Chat avatar: foto profil dari `users.photo`, fallback ke inisial (DR/NK)
+- Edit profil: `ProfileController` + migration `photo` column + role-based default avatars
+- Landing page: 7 sections (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
+- Redis server wajib jalan untuk autentikasi API key device (middleware `AuthenticateApiKey`)
+- Redis tersedia di `redis_server/redis-server.exe`

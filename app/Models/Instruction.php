@@ -29,13 +29,13 @@ class Instruction extends Model
     // Relasi: dokter yang memberi instruksi (via user_id atau dokter_id)
     public function dokter()
     {
-        return $this->belongsTo(User::class, 'dokter_id')->select('id', 'name');
+        return $this->belongsTo(User::class, 'dokter_id')->select('id', 'name', 'photo');
     }
 
     // Relasi: nakes yang melaksanakan (via nakes_id atau completed_by)
     public function nakes()
     {
-        return $this->belongsTo(User::class, 'nakes_id')->select('id', 'name');
+        return $this->belongsTo(User::class, 'nakes_id')->select('id', 'name', 'photo');
     }
 
     public function device()

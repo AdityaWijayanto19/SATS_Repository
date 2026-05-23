@@ -169,20 +169,53 @@
         </div>
 
         {{-- Grafik Sensor --}}
-        <div class="grid grid-cols-3 gap-3">
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-medium text-[rgb(0,62,48)]">Grafik Vital Sign</p>
+            <div class="flex bg-gray-100 rounded-lg p-0.5">
+                <button @click="chartMode = 'separate'"
+                    class="px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer"
+                    :class="chartMode === 'separate' ? 'bg-white text-[rgb(0,62,48)] shadow-sm' : 'text-gray-500 hover:text-gray-700'">
+                    Terpisah
+                </button>
+                <button @click="chartMode = 'combined'; $nextTick(() => initCombinedChart())"
+                    class="px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer"
+                    :class="chartMode === 'combined' ? 'bg-white text-[rgb(0,62,48)] shadow-sm' : 'text-gray-500 hover:text-gray-700'">
+                    Gabungan
+                </button>
+            </div>
+        </div>
 
+        {{-- Charts: Terpisah --}}
+        <div x-show="chartMode === 'separate'" class="grid grid-cols-3 gap-3">
             @foreach ([['id' => 'hrChart', 'label' => 'Heart Rate', 'unit' => 'bpm'], ['id' => 'spo2Chart', 'label' => 'SpO2', 'unit' => '%'], ['id' => 'tempChart', 'label' => 'Temperature', 'unit' => '°C']] as $chart)
                 <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
                     <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
                         <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $chart['label'] }}</p>
                         <p class="text-[11px] text-gray-400 mt-0.5">{{ $chart['unit'] }} — 10 menit terakhir</p>
                     </div>
-                    {{-- position:relative wajib agar Chart.js bisa hitung tinggi --}}
                     <div class="p-4 relative" style="height:200px;">
                         <canvas id="{{ $chart['id'] }}"></canvas>
                     </div>
                 </div>
             @endforeach
+        </div>
+
+        {{-- Chart: Gabungan --}}
+        <div x-show="chartMode === 'combined'" x-cloak>
+            <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
+                <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
+                    <p class="text-sm font-medium text-[rgb(0,62,48)]">Heart Rate, SpO2 & Temperature</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">bpm / % / °C — 10 menit terakhir</p>
+                </div>
+                <div class="p-4 relative" style="height:260px;">
+                    <canvas id="chartVitalSignCombined"></canvas>
+                </div>
+                <div class="flex justify-center gap-5 pb-3 text-xs text-gray-500">
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#ef4444"></span> Heart Rate</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#3b82f6"></span> SpO2</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#f59e0b"></span> Temperature</span>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -196,7 +229,7 @@
             let globalSelectedDeviceId = null;
 
             // Chart instances
-            let hrChart, spo2Chart, tempChart;
+            let hrChart, spo2Chart, tempChart, combinedChart;
 
             function initCharts() {
                 const chartOpts = {
@@ -228,16 +261,107 @@
                 });
             }
 
+            function initCombinedChart() {
+                if (combinedChart) return;
+                const canvas = document.getElementById('chartVitalSignCombined');
+                if (!canvas) return;
+                combinedChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Heart Rate (bpm)',
+                                data: [],
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239,68,68,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y',
+                            },
+                            {
+                                label: 'SpO2 (%)',
+                                data: [],
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59,130,246,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                            },
+                            {
+                                label: 'Temperature (°C)',
+                                data: [],
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245,158,11,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y2',
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 300 },
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } },
+                            y: {
+                                position: 'left',
+                                min: 40, max: 160,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: { font: { size: 9 }, color: '#ef4444' },
+                                title: { display: true, text: 'bpm', font: { size: 9 }, color: '#ef4444' }
+                            },
+                            y1: {
+                                position: 'right',
+                                min: 80, max: 100,
+                                grid: { drawOnChartArea: false },
+                                ticks: { font: { size: 9 }, color: '#3b82f6' },
+                                title: { display: true, text: '%', font: { size: 9 }, color: '#3b82f6' }
+                            },
+                            y2: {
+                                position: 'right',
+                                min: 34, max: 41,
+                                grid: { drawOnChartArea: false },
+                                ticks: { font: { size: 9 }, color: '#f59e0b' },
+                                title: { display: true, text: '°C', font: { size: 9 }, color: '#f59e0b' },
+                                offset: true
+                            }
+                        },
+                        elements: { point: { radius: 2, hoverRadius: 4 }, line: { tension: 0.3, borderWidth: 1.5 } }
+                    }
+                });
+                // Load existing data if available
+                if (hrChart?.data?.labels?.length > 0) {
+                    combinedChart.data.labels = hrChart.data.labels;
+                    combinedChart.data.datasets[0].data = hrChart.data.datasets[0].data;
+                    combinedChart.data.datasets[1].data = spo2Chart.data.datasets[0].data;
+                    combinedChart.data.datasets[2].data = tempChart.data.datasets[0].data;
+                    combinedChart.update('none');
+                }
+            }
+
             function updateCharts(history) {
                 if (!history) {
-                    [hrChart, spo2Chart, tempChart].forEach(c => {
-                        if (c) { c.data.labels = []; c.data.datasets[0].data = []; c.update('none'); }
+                    [hrChart, spo2Chart, tempChart, combinedChart].forEach(c => {
+                        if (c) { c.data.labels = []; c.data.datasets.forEach(ds => ds.data = []); c.update('none'); }
                     });
                     return;
                 }
                 hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = history.heart_rate; hrChart.update('none');
                 spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = history.spo2; spo2Chart.update('none');
                 tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = history.temperature; tempChart.update('none');
+                if (combinedChart) {
+                    combinedChart.data.labels = history.labels;
+                    combinedChart.data.datasets[0].data = history.heart_rate;
+                    combinedChart.data.datasets[1].data = history.spo2;
+                    combinedChart.data.datasets[2].data = history.temperature;
+                    combinedChart.update('none');
+                }
             }
 
             function dashboard() {
@@ -245,6 +369,7 @@
                     selectedDeviceId: null,
                     latest: null,
                     deviceOnline: false,
+                    chartMode: 'separate',
 
                     async init() {
                         initCharts();
