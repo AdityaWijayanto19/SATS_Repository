@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Events\DeviceStatusChanged;
+use App\Events\DeviceStatusChangedGlobal;
+use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\Devices;
 use App\Models\NakesDeviceConfig;
 use App\Models\SensorData;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -58,15 +61,72 @@ class DashboardController extends Controller
                     'spo2' => $latest->spo2,
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
-                    'created_at' => $latest->created_at?->format('H:i'),
+                    'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                     'ml_prediction' => $device->ml_prediction,
                     'ml_condition' => $device->ml_condition,
                     'ml_risk_level' => $device->ml_risk_level,
                     'ml_probabilities' => json_decode($device->ml_probabilities, true),
-                    'ml_predicted_at' => $device->ml_predicted_at?->format('H:i'),
+                    'ml_predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
             ];
         })->filter(fn($d) => $d['latest'] !== null)->values();
+
+        // Stats untuk superadmin dashboard
+        if ($user->role === 'superadmin') {
+            $totalDevices = Devices::count();
+            $activeDevices = Devices::where('status', 'online')->count();
+            $inactiveDevices = Devices::where('status', 'offline')->count();
+            $totalUsers = User::count();
+            $onlineUsers = \DB::table('sessions')
+                ->whereNotNull('user_id')
+                ->where('last_activity', '>=', now()->subMinutes(5)->timestamp)
+                ->count();
+
+            // Perangkat aktif dengan info nakes dan kondisi pasien
+            $activeDeviceList = Devices::where('status', 'online')
+                ->with(['sensorData' => function ($q) {
+                    $q->latest('created_at')->limit(1);
+                }])
+                ->get()
+                ->map(function ($device) {
+                    $latestSensor = $device->sensorData->first();
+                    $nakesConfig = NakesDeviceConfig::where('device_id', $device->device_id)->first();
+                    $nakesName = $nakesConfig?->user?->name ?? '-';
+
+                    // Ambil semua dokter yang memantau dari pivot table
+                    $dokterNames = $device->monitoredByDokters()
+                        ->pluck('name')
+                        ->toArray();
+                    $dokterName = !empty($dokterNames) ? implode(', ', $dokterNames) : '-';
+
+                    return [
+                        'device_id' => $device->device_id,
+                        'status' => $latestSensor?->status ?? 'normal',
+                        'heart_rate' => $latestSensor?->heart_rate,
+                        'spo2' => $latestSensor?->spo2,
+                        'temperature' => $latestSensor?->temperature,
+                        'nakes_name' => $nakesName,
+                        'dokter_name' => $dokterName,
+                        'updated_at' => $latestSensor?->created_at?->setTimezone('Asia/Jakarta')->format('H:i:s'),
+                    ];
+                });
+
+            // Activity logs for the log panel
+            $activityLogs = ActivityLog::orderByDesc('created_at')->limit(20)->get()->map(fn($log) => [
+                'id' => $log->id,
+                'type' => $log->type,
+                'message' => $log->message,
+                'icon' => $log->icon,
+                'user_name' => $log->user_name,
+                'user_role' => $log->user_role,
+                'device_id' => $log->device_id,
+                'created_at' => $log->created_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
+            ]);
+
+            return view('pages.superadmin.dashboard', compact(
+                'devices', 'totalDevices', 'activeDevices', 'inactiveDevices', 'totalUsers', 'onlineUsers', 'activeDeviceList', 'activityLogs'
+            ));
+        }
 
         return view($this->getViewByRole('dashboard'), compact('devices'));
     }
@@ -115,6 +175,14 @@ class DashboardController extends Controller
         ]);
 
         broadcast(new DeviceStatusChanged($config->device_id, $request->status));
+        broadcast(new DeviceStatusChangedGlobal($config->device_id, $request->status));
+
+        $user = Auth::user();
+        $logType = $request->status === 'online' ? 'device.online' : 'device.offline';
+        $logMsg = $request->status === 'online'
+            ? "{$user->name} mengaktifkan perangkat"
+            : "{$user->name} menonaktifkan perangkat";
+        ActivityLog::log($logType, $logMsg, $user->name, $user->role, $config->device_id);
 
         return response()->json([
             'success' => true,
@@ -158,6 +226,74 @@ class DashboardController extends Controller
         return redirect()->route('dashboard')->with('success', 'Perangkat berhasil dikonfigurasi!');
     }
 
+    // Dokter memilih device untuk dipantau
+    public function selectDevice(Request $request)
+    {
+        $request->validate([
+            'device_id' => 'required|string|exists:devices,device_id',
+        ]);
+
+        // Cek apakah sudah memantau device ini
+        $exists = \App\Models\DeviceMonitoring::where('device_id', $request->device_id)
+            ->where('dokter_id', Auth::id())
+            ->exists();
+
+        if (!$exists) {
+            // Tambahkan monitoring baru (bisa lebih dari 1 dokter per device)
+            \App\Models\DeviceMonitoring::create([
+                'device_id' => $request->device_id,
+                'dokter_id' => Auth::id(),
+            ]);
+
+            $user = Auth::user();
+            ActivityLog::log('monitoring.started', "Dokter {$user->name} mulai memantau perangkat", $user->name, $user->role, $request->device_id);
+        }
+
+        // Broadcast update ke superadmin
+        $device = Devices::where('device_id', $request->device_id)->first();
+        broadcast(new DeviceStatusChangedGlobal($request->device_id, $device->status));
+
+        return response()->json(['success' => true]);
+    }
+
+    // Dokter berhenti memantau device tertentu
+    public function deselectDevice(Request $request)
+    {
+        $request->validate([
+            'device_id' => 'required|string|exists:devices,device_id',
+        ]);
+
+        \App\Models\DeviceMonitoring::where('device_id', $request->device_id)
+            ->where('dokter_id', Auth::id())
+            ->delete();
+
+        // Broadcast update ke superadmin
+        $device = Devices::where('device_id', $request->device_id)->first();
+        broadcast(new DeviceStatusChangedGlobal($request->device_id, $device->status));
+
+        $user = Auth::user();
+        ActivityLog::log('monitoring.stopped', "Dokter {$user->name} berhenti memantau perangkat", $user->name, $user->role, $request->device_id);
+
+        return response()->json(['success' => true]);
+    }
+
+    // Dokter berhenti memantau semua device (saat logout)
+    public function deselectAllDevices()
+    {
+        $deviceIds = \App\Models\DeviceMonitoring::where('dokter_id', Auth::id())
+            ->pluck('device_id');
+
+        \App\Models\DeviceMonitoring::where('dokter_id', Auth::id())->delete();
+
+        // Broadcast update ke superadmin untuk setiap device
+        foreach ($deviceIds as $deviceId) {
+            $device = Devices::where('device_id', $deviceId)->first();
+            if ($device) {
+                broadcast(new DeviceStatusChangedGlobal($deviceId, $device->status));
+            }
+        }
+    }
+
     // API: daftar semua perangkat + data grafik (untuk polling dashboard)
     public function getDevicesApi()
     {
@@ -183,15 +319,15 @@ class DashboardController extends Controller
                     'spo2' => $latest->spo2,
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
-                    'created_at' => $latest->created_at?->format('H:i'),
+                    'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                     'ml_prediction' => $device->ml_prediction,
                     'ml_condition' => $device->ml_condition,
                     'ml_risk_level' => $device->ml_risk_level,
                     'ml_probabilities' => json_decode($device->ml_probabilities, true),
-                    'ml_predicted_at' => $device->ml_predicted_at?->format('H:i'),
+                    'ml_predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
                 'history' => [
-                    'labels' => $history->map(fn($d) => $d->created_at->format('H:i')),
+                    'labels' => $history->map(fn($d) => $d->created_at->setTimezone('Asia/Jakarta')->format('H:i')),
                     'heart_rate' => $history->pluck('heart_rate'),
                     'spo2' => $history->pluck('spo2'),
                     'temperature' => $history->pluck('temperature'),

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\Instruction;
 use App\Events\InstructionSent;
 use App\Events\InstructionStatusUpdated;
@@ -24,8 +25,8 @@ class InstructionService
                     'is_completed'    => (bool) $item->is_completed,
                     'user_name'       => $item->dokter?->name ?? $item->creator?->name ?? 'Dokter SATS',
                     'nakes_name'      => $item->nakes?->name ?? 'Nakes SATS',
-                    'waktu'           => $item->created_at->format('H:i'),
-                    'completed_at'    => $item->completed_at ? $item->completed_at->format('H:i') : null,
+                    'waktu'           => $item->created_at->setTimezone('Asia/Jakarta')->format('H:i'),
+                    'completed_at'    => $item->completed_at ? $item->completed_at->setTimezone('Asia/Jakarta')->format('H:i') : null,
                     'completed_by'    => $item->nakes?->name ?? '—',
                     'respon_nakes'    => $item->respon_nakes, // Updated column name
                     'laporan_nakes'   => $item->laporan_nakes,
@@ -47,6 +48,9 @@ class InstructionService
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionSent failed: ' . $e->getMessage());
         }
+
+        $user = Auth::user();
+        ActivityLog::log('instruction.sent', "Dokter {$user->name} mengirim instruksi pada perangkat", $user->name, $user->role, $data['device_id']);
 
         return $formatted;
     }
@@ -72,6 +76,9 @@ class InstructionService
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Broadcast InstructionStatusUpdated failed: ' . $e->getMessage());
         }
+
+        $user = Auth::user();
+        ActivityLog::log('instruction.completed', "Nakes {$user->name} menyelesaikan instruksi pada perangkat", $user->name, $user->role, $instruction->device_id);
 
         return $instruction;
     }
@@ -125,8 +132,8 @@ class InstructionService
             'is_completed'    => (bool) $item->is_completed,
             'user_name'        => $item->dokter?->name ?? ($item->instruksi_dokter ? $currentUser->name : 'Dokter SATS'),
             'nakes_name'       => $item->nakes?->name ?? ($item->laporan_nakes ? $currentUser->name : 'Nakes SATS'),
-            'waktu'           => now()->format('H:i'), // <--- Ini yang bikin jam langsung muncul
-            'completed_at'    => $item->completed_at ? $item->completed_at->format('H:i') : null,
+            'waktu'           => now()->setTimezone('Asia/Jakarta')->format('H:i'),
+            'completed_at'    => $item->completed_at ? $item->completed_at->setTimezone('Asia/Jakarta')->format('H:i') : null,
             'respon_nakes'    => $item->respon_nakes,
             'laporan_nakes'   => $item->laporan_nakes,
         ];

@@ -351,6 +351,27 @@
                             updateCharts(selected.history);
                         }
                         window.dispatchEvent(new CustomEvent('deviceSelected', { detail: { deviceId } }));
+
+                        // Register ke backend bahwa dokter memantau device ini
+                        fetch('/dokter/select-device', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                            body: JSON.stringify({ device_id: deviceId }),
+                        }).catch(err => console.error('Error registering device monitoring:', err));
+                    },
+
+                    deselectDevice(deviceId) {
+                        fetch('/dokter/deselect-device', {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                            body: JSON.stringify({ device_id: deviceId }),
+                        }).catch(err => console.error('Error removing device monitoring:', err));
                     },
 
                     getStatusClass(v, t) {

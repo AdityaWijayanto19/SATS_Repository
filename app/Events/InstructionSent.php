@@ -38,7 +38,7 @@ class InstructionSent implements ShouldBroadcastNow
                 'instruksi_dokter' => $this->instruction->instruksi_dokter,
                 'is_completed' => (bool) $this->instruction->is_completed,
                 'user_name'    => $this->instruction->dokter?->name ?? 'Dokter SATS',
-                'waktu'        => $this->instruction->created_at->format('H:i'),
+                'waktu'        => $this->instruction->created_at->setTimezone('Asia/Jakarta')->format('H:i'),
                 'created_at'   => $this->instruction->created_at->toIso8601String(),
                 'completed_at' => null,
                 'completed_by' => '—',

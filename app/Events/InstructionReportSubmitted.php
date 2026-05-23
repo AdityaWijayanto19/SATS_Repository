@@ -35,7 +35,7 @@ class InstructionReportSubmitted implements ShouldBroadcastNow
                 'device_id'       => $this->instruction->device_id,
                 'laporan_nakes'   => $this->instruction->laporan_nakes,
                 'nakes_name'      => $this->instruction->nakes?->name ?? 'Nakes SATS',
-                'waktu'           => $this->instruction->created_at->format('H:i'),
+                'waktu'           => $this->instruction->created_at->setTimezone('Asia/Jakarta')->format('H:i'),
                 'created_at'      => $this->instruction->created_at->toIso8601String(),
                 'is_completed'    => false,
             ],

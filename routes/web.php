@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ManajemenAlatController;
 use App\Http\Controllers\SuperadminLaporanController;
+use App\Http\Controllers\UserController;
 
 Route::get('/', function () {
     return view('pages.landing');
@@ -50,6 +51,8 @@ Route::middleware(['auth'])->group(function () {
     // Dokter Routes
     Route::prefix('dokter')->middleware('role:dokter')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dokter.dashboard');
+        Route::post('/select-device', [DashboardController::class, 'selectDevice'])->name('dokter.select-device');
+        Route::delete('/deselect-device', [DashboardController::class, 'deselectDevice'])->name('dokter.deselect-device');
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('dokter.input-data-pasien');
         Route::get('/laporan', [LaporanController::class, 'index'])->name('dokter.laporan');
         Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('dokter.laporan.pdf');
@@ -75,6 +78,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/manajemen-alat/{device_id}', [ManajemenAlatController::class, 'destroy'])->name('superadmin.manajemen-alat.destroy');
         Route::get('/manajemen-alat/{device_id}', [ManajemenAlatController::class, 'show'])->name('superadmin.manajemen-alat.show');
         Route::get('/manajemen-user', [DashboardController::class, 'viewManajemenUserPage'])->name('superadmin.manajemen-user');
+        Route::post('/manajemen-user', [UserController::class, 'store'])->name('superadmin.manajemen-user.store');
+        Route::delete('/manajemen-user/{user}', [UserController::class, 'destroy'])->name('superadmin.manajemen-user.destroy');
         Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasienPage'])->name('superadmin.input-data-pasien');
         Route::get('/laporan', [SuperadminLaporanController::class, 'index'])->name('superadmin.laporan');
         Route::get('/laporan/pdf', [SuperadminLaporanController::class, 'pdf'])->name('superadmin.laporan.pdf');
@@ -82,4 +87,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Device list endpoint (for dashboard polling)
     Route::get('/api/devices', [DashboardController::class, 'getDevicesApi']);
+
+    // Online users count endpoint (for superadmin dashboard polling)
+    Route::get('/api/online-users-count', function () {
+        $count = \DB::table('sessions')
+            ->whereNotNull('user_id')
+            ->where('last_activity', '>=', now()->subMinutes(5)->timestamp)
+            ->count();
+        return response()->json(['success' => true, 'count' => $count]);
+    });
 });

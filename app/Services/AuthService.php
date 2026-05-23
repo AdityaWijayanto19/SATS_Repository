@@ -134,6 +134,24 @@ class AuthService
 
     public function logout(Request $request): void
     {
+        $user = Auth::guard('web')->user();
+
+        // Jika dokter, hapus semua monitoring sebelum logout
+        if ($user && $user->role === 'dokter') {
+            $deviceIds = \App\Models\DeviceMonitoring::where('dokter_id', $user->id)
+                ->pluck('device_id');
+
+            \App\Models\DeviceMonitoring::where('dokter_id', $user->id)->delete();
+
+            // Broadcast update ke superadmin
+            foreach ($deviceIds as $deviceId) {
+                $device = \App\Models\Devices::where('device_id', $deviceId)->first();
+                if ($device) {
+                    broadcast(new \App\Events\DeviceStatusChangedGlobal($deviceId, $device->status));
+                }
+            }
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

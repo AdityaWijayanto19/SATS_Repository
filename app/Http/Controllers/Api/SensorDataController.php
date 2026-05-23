@@ -181,7 +181,7 @@ class SensorDataController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'labels' => $data->map(fn($d) => $d->created_at->format('H:i')),
+                'labels' => $data->map(fn($d) => $d->created_at->setTimezone('Asia/Jakarta')->format('H:i')),
                 'heart_rate' => $data->pluck('heart_rate'),
                 'spo2' => $data->pluck('spo2'),
                 'temperature' => $data->pluck('temperature'),

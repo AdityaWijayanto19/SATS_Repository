@@ -116,12 +116,14 @@
 - Download PDF (via DomPDF + QuickChart.io)
 - `LaporanController` sudah role-aware (cek `auth()->user()->role`)
 
-### 6. Dashboard Superadmin [UI SELESAI, DATA DUMMY]
+### 6. Dashboard Superadmin [TERHUBUNG KE BACKEND]
 
-- 4 kartu statistik: Total Alat, Alat Aktif, Alat Non-Aktif, Total Pengguna
-- Tabel Alat Kritis (5 perangkat dengan status Warning/Kritis)
-- Log Aktivitas Terbaru (timeline dengan indikator warna)
-- **Belum terhubung ke database real**
+- 5 kartu statistik: Total Alat, Alat Aktif, Alat Non-Aktif, Total Pengguna, Pengguna Online
+- Tabel Perangkat Aktif (device_id, kondisi pasien, nakes, dokter, waktu update)
+- Log Aktivitas Terbaru (16 event types, timeline dengan indikator warna)
+- Real-time updates via WebSocket (Alpine.js + Laravel Echo)
+- **Backend: DashboardController + ActivityLog model**
+- **KNOWN ISSUE:** WebSocket real-time update untuk activity log tidak berfungsi (403 pada `/broadcasting/auth`). Data tampil setelah refresh halaman.
 
 ### 7. Manajemen Alat (Superadmin) [TERHUBUNG KE BACKEND]
 
@@ -132,13 +134,14 @@
 - Auto-generate API key saat registrasi device (ditampilkan sekali)
 - **Backend: ManajemenAlatController (store, show, destroy)**
 
-### 8. Manajemen User (Superadmin) [UI SELESAI, BELUM ADA ROUTE]
+### 8. Manajemen User (Superadmin) [TERHUBUNG KE BACKEND]
 
 - Tabel pengguna (data dari database)
 - Badge peran berwarna: Super Admin (ungu), Dokter (biru), Perawat (pink)
 - Modal "+ Tambah User" (ID, Nama, Peran dropdown, Email)
 - Modal Detail user (avatar, role badge, telepon, tgl bergabung)
-- **Backend: UserController sudah ada (store, update, destroy), belum ada route di web.php**
+- **Backend: UserController (store, update, destroy) + routes terdaftar di web.php**
+- **Routes:** POST `/superadmin/manajemen-user`, DELETE `/superadmin/manajemen-user/{user}`
 
 ### 9. Laporan Superadmin [UI SELESAI, DATA DUMMY]
 
@@ -167,6 +170,8 @@
 - 5 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService
 - 11 form request validation
 - 3 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
+- 1 event class: ActivityLogCreated (ShouldBroadcastNow, broadcast activity log real-time)
+- 16 activity log events: user login/logout, password reset, device online/offline/added/deleted, monitoring started/stopped, patient warning/critical, instruction sent/completed, user added/deleted
 - 2 job class: ProcessDeviceData, ProcessSensorData
 - API sensor data (POST, GET latest, GET history)
 - API instruksi (GET, POST, POST report, PATCH update, PATCH complete)
@@ -179,10 +184,8 @@
 
 **Belum ada:**
 - Backend input data pasien (POST handler)
-- Route untuk UserController (CRUD user belum terhubung ke UI)
 - Laporan dari database (masih dummy data)
 - Device config dari database (masih hardcoded)
-- Activity log controller
 
 ### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
 
@@ -230,6 +233,7 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 ## Rencana Perbaikan & Pengembangan
 
 ### Prioritas 1 — Realtime & Delay Fix
+- [ ] **FIX: WebSocket broadcasting auth 403 error** — `/broadcasting/auth` return 403, activity log dan device status tidak real-time. Kemungkinan Reverb auth proxy tidak terkonfigurasi dengan benar.
 - [ ] Kurangi delay pengiriman data simulator → dashboard
 - [ ] Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif
 - [ ] Kurangi atau hapus cache TTL pada DeviceService (saat ini 5 menit)
@@ -243,11 +247,11 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 
 ### Prioritas 3 — Backend yang Belum Selesai
 - [ ] Backend input data pasien (POST route + controller → tabel `patients`)
-- [ ] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
+- [x] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
 - [ ] Aktifkan query database di LaporanController (ganti dummy data)
 - [ ] Aktifkan query database di SuperadminLaporanController (ganti dummy data)
 - [ ] Device config dari database (ganti hardcoded)
-- [ ] Activity log: tulis log di setiap aksi penting
+- [x] Activity log: 16 event types sudah terinstrumentasi
 
 ### Prioritas 4 — Integrasi & Testing
 - [ ] Testing dengan hardware IoT real
@@ -290,6 +294,7 @@ app/Events/
   InstructionSent.php             # Broadcast saat dokter kirim instruksi
   InstructionStatusUpdated.php    # Broadcast saat nakes selesaikan instruksi
   InstructionReportSubmitted.php  # Broadcast saat nakes submit laporan
+  ActivityLogCreated.php          # Broadcast activity log real-time ke superadmin dashboard
 
 app/Jobs/
   ProcessDeviceData.php           # Queue: proses system status device
@@ -528,7 +533,8 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 | Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
 | Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed di database |
 | Dashboard tidak update | Pastikan simulator berjalan + Reverb & queue worker running |
-| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terpisah |
+| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terparsah |
+| Activity log tidak real-time | **KNOWN ISSUE:** `/broadcasting/auth` return 403. Data tampil setelah refresh. Perlu investigasi Reverb auth config. |
 | ML prediction tidak muncul | Pastikan `php artisan queue:work` berjalan, cek log untuk "ML trigger" |
 
 ---
@@ -592,4 +598,4 @@ Rekam medis ter-generate otomatis
 
 ---
 
-*Last updated: 18 Mei 2026*
+*Last updated: 23 Mei 2026*

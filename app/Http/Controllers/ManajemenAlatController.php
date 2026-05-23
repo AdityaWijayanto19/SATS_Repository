@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\Devices;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 
@@ -56,6 +58,9 @@ class ManajemenAlatController extends Controller
             'is_active' => true,
         ]);
 
+        $user = Auth::user();
+        ActivityLog::log('device.added', "Admin {$user->name} menambahkan alat baru", $user->name, $user->role, $device->device_id);
+
         return response()->json([
             'success' => true,
             'message' => 'Perangkat berhasil didaftarkan',
@@ -94,6 +99,9 @@ class ManajemenAlatController extends Controller
     {
         $device = Devices::where('device_id', $deviceId)->firstOrFail();
         $device->delete();
+
+        $user = Auth::user();
+        ActivityLog::log('device.deleted', "Admin {$user->name} menghapus alat", $user->name, $user->role, $deviceId);
 
         return response()->json([
             'success' => true,

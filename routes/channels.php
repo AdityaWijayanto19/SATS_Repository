@@ -14,3 +14,8 @@ Broadcast::channel('device.{deviceId}', function (User $user, $deviceId) {
     // Verify the device exists
     return Devices::where('device_id', $deviceId)->exists();
 });
+
+Broadcast::channel('superadmin.dashboard', function (User $user) {
+    // Only superadmin can subscribe to this channel
+    return $user->role === 'superadmin';
+});

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\SensorDataReceived;
+use App\Models\ActivityLog;
 use App\Models\Devices;
 use App\Models\SensorData;
 use App\Services\PatientMonitoringService;
@@ -34,6 +35,23 @@ class SensorService
 
         // Insert sensor data
         $sensorData = SensorData::create($data);
+
+        // Check for patient status change
+        if (in_array($sensorData->status, ['warning', 'critical'])) {
+            $previousSensor = SensorData::where('device_id', $data['device_id'])
+                ->where('id', '!=', $sensorData->id)
+                ->latest('created_at')
+                ->first();
+
+            $previousStatus = $previousSensor?->status ?? 'normal';
+            if ($sensorData->status !== $previousStatus) {
+                $logType = $sensorData->status === 'critical' ? 'patient.critical' : 'patient.warning';
+                $logMsg = $sensorData->status === 'critical'
+                    ? "Kondisi pasien pada perangkat {$data['device_id']} berubah menjadi CRITICAL"
+                    : "Kondisi pasien pada perangkat {$data['device_id']} berubah menjadi WARNING";
+                ActivityLog::log($logType, $logMsg, null, null, $data['device_id']);
+            }
+        }
 
         Log::info('Service: data berhasil disimpan', [
             'id' => $sensorData->id
