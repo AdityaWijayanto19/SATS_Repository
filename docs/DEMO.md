@@ -134,7 +134,7 @@ php artisan migrate --seed
 ```
 
 Perintah ini akan:
-- Membuat semua tabel (users, devices, sensor_datas, dll.)
+- Membuat semua tabel (users, devices, sensor_datas, monitoring_sessions, sensor_readings, patients, dll.)
 - Mengisi data awal: 3 akun user + 2 device + 2 API key
 
 > Jika tabel sudah ada, gunakan `php artisan migrate:fresh --seed` untuk reset ulang.
@@ -374,6 +374,50 @@ Profile simulator:
 3. Probability card menampilkan: Membaik (%) / Stabil (%) / Memburuk (%)
 4. Data di-update real-time via WebSocket
 
+### 7. Monitoring Session & Laporan
+
+#### a. Session Otomatis Dibuat
+
+1. Nakes aktifkan perangkat → session otomatis dibuat (status: active)
+2. Dashboard nakes menampilkan banner session aktif dengan nama pasien & nomor rekam medis
+3. Data sensor masuk ke `sensor_data` (temporary) untuk realtime dashboard
+4. Nakes matikan perangkat → session otomatis di-finalize:
+   - Data `sensor_data` di-copy ke `sensor_readings` (dengan session_id)
+   - Semua `sensor_data` untuk device dihapus
+   - Session status → `completed`
+
+#### b. Input Data Pasien
+
+**Dari halaman Input Data Pasien (`/nakes/input-data-pasien`):**
+1. Pilih perangkat dari dropdown (menampilkan device yang punya active session)
+2. Isi form: nama, NIK, tanggal lahir, umur, jenis kelamin, penyakit/alergi, catatan
+3. Data pasien di-link ke active session
+4. Nomor rekam medis auto-generate: `RM-{DEVICE_ID}-{YYYYMMDD}-{SEQ}`
+
+**Dari halaman Laporan (modal popup):**
+1. Buka halaman laporan → pilih sesi yang belum ada data pasiennya
+2. Klik tombol **"Input Data Pasien"** → modal popup muncul dengan background blur putih
+3. Isi form → data pasien di-link ke session tersebut
+4. Halaman otomatis update (AJAX, tanpa refresh)
+
+#### c. Lihat & Unduh Laporan
+
+1. Buka `/nakes/laporan`
+2. Perangkat terdeteksi otomatis dari `NakesDeviceConfig` (tidak perlu dropdown)
+3. Pilih sesi dari dropdown → data dimuat via **AJAX tanpa refresh halaman**
+4. Centang vital sign yang ingin ditampilkan (Heart Rate, SpO2, Suhu)
+5. Lihat: identitas pasien, grafik vital signs, nilai vital terbaru, statistik, tabel riwayat
+6. Klik **"Unduh PDF"** → PDF di-generate dengan DomPDF + grafik dari QuickChart.io
+7. Nama file: `Laporan_{nomor_rekam_medis}_{tanggal}.pdf`
+
+#### d. Laporan Dokter (Read-Only)
+
+1. Login sebagai dokter → buka `/dokter/laporan`
+2. Pilih perangkat dari dropdown (device yang dipantau dokter)
+3. Pilih sesi → data dimuat via AJAX
+4. Dokter bisa lihat laporan tapi **tidak bisa edit** data pasien
+5. Download PDF tersedia
+
 ---
 
 ## Akun Demo
@@ -414,6 +458,11 @@ Profile simulator:
 | Simulator `ModuleNotFoundError` | Jalankan `pip install -r requirements.txt` di folder `simulasi_py/` |
 | Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
 | Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed |
+| Laporan kosong / tidak ada sesi | Pastikan pernah aktifkan device & data masuk. Cek `monitoring_sessions` di DB |
+| `sensor_data` masih ada isinya | Jalankan `php artisan tinker` → `SensorData::where('device_id','...')->delete()` |
+| Modal input pasien tidak muncul | Cek console browser, pastikan tidak ada Alpine.js error |
+| AJAX session load gagal | Cek Network tab di DevTools, pastikan `/nakes/laporan/session-data` return 200 |
+| PDF download error | Pastikan `php artisan queue:work` berjalan & QuickChart.io bisa diakses |
 
 ---
 
@@ -487,7 +536,8 @@ Tidak ada perubahan kode backend yang diperlukan.
 | [BACKEND.md](BACKEND.md) | Arsitektur backend |
 | [DATABASE.md](DATABASE.md) | Struktur database |
 | [FRONTEND.md](FRONTEND.md) | Struktur frontend |
+| [LAPORAN_SYSTEM.md](LAPORAN_SYSTEM.md) | Desain & implementasi sistem laporan & monitoring session |
 
 ---
 
-*Last updated: 23 Mei 2026*
+*Last updated: 24 Mei 2026*

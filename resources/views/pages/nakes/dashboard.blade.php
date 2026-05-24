@@ -17,19 +17,17 @@
             </div>
 
             <div class="flex items-center gap-2">
-                {{-- Toggle Perangkat --}}
-                <button @click="toggleDevice()"
-                    class="cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition"
+                {{-- Status Perangkat (read-only) --}}
+                <div class="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border"
                     :class="deviceOnline
-                        ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'">
-                    <span x-text="deviceOnline ? 'Matikan Perangkat' : 'Aktifkan Perangkat'"></span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M5.636 5.636a9 9 0 1012.728 0M12 3v6" />
-                    </svg>
-                </button>
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-gray-50 text-gray-500 border-gray-200'">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span x-show="deviceOnline" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5" :class="deviceOnline ? 'bg-green-500' : 'bg-gray-400'"></span>
+                    </span>
+                    <span x-text="deviceOnline ? 'Perangkat Aktif' : 'Perangkat Tidak Aktif'"></span>
+                </div>
 
                 {{-- Ganti Perangkat --}}
                 <form method="POST" action="{{ route('nakes.device-config.reset') }}"
@@ -45,6 +43,69 @@
                         </svg>
                     </button>
                 </form>
+            </div>
+        </div>
+
+        {{-- Info Sesi Monitoring --}}
+        <div x-show="showSessionBanner" x-transition class="mb-4">
+            <!-- Sesi Aktif -->
+            <div x-show="activeSession && deviceOnline"
+                class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-blue-800">Sesi Monitoring Aktif</p>
+                            <p class="text-xs text-blue-600">
+                                <span x-text="activeSession?.medical_record_number ?? '-'"></span>
+                                <span x-show="activeSession?.patient_name"> — <span x-text="activeSession?.patient_name"></span></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-blue-500">Dimulai</p>
+                        <p class="text-sm font-medium text-blue-700" x-text="activeSession?.started_at ?? '-'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sesi Berakhir -->
+            <div x-show="!deviceOnline && lastSession"
+                class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">Sesi Monitoring Berakhir</p>
+                            <p class="text-xs text-gray-500">
+                                <span x-text="lastSession?.medical_record_number ?? '-'"></span>
+                                <span x-show="lastSession?.patient_name"> — <span x-text="lastSession?.patient_name"></span></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400">Berakhir</p>
+                            <p class="text-sm font-medium text-gray-600" x-text="lastSession?.ended_at ?? '-'"></p>
+                        </div>
+                        <button @click="showSessionBanner = false"
+                            class="p-1 hover:bg-gray-200 rounded-full transition cursor-pointer">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -370,6 +431,9 @@
                     latest: null,
                     deviceOnline: false,
                     chartMode: 'separate',
+                    activeSession: null,
+                    lastSession: null,
+                    showSessionBanner: true,
 
                     async init() {
                         initCharts();
@@ -382,6 +446,8 @@
                                 globalSelectedDeviceId = this.selectedDeviceId;
                                 this.latest = device.latest;
                                 this.deviceOnline = device.status === 'online';
+                                this.activeSession = device.active_session ?? null;
+                                this.showSessionBanner = true;
                                 updateCharts(device.history);
                                 window.dispatchEvent(new CustomEvent('deviceSelected', {
                                     detail: { deviceId: this.selectedDeviceId }
@@ -397,7 +463,28 @@
                         if (!window.Echo || !this.selectedDeviceId) return;
                         window.Echo.private(`device.${this.selectedDeviceId}`)
                             .listen('.device.status.changed', (e) => {
+                                const wasOnline = this.deviceOnline;
                                 this.deviceOnline = e.status === 'online';
+
+                                // When device goes offline, move activeSession to lastSession
+                                if (wasOnline && e.status === 'offline' && this.activeSession) {
+                                    this.lastSession = {
+                                        ...this.activeSession,
+                                        ended_at: new Date().toLocaleString('id-ID', {
+                                            day: '2-digit', month: 'short', year: 'numeric',
+                                            hour: '2-digit', minute: '2-digit'
+                                        })
+                                    };
+                                    this.activeSession = null;
+                                    this.showSessionBanner = true;
+                                }
+
+                                // When device goes online, clear lastSession and fetch new active session
+                                if (!wasOnline && e.status === 'online') {
+                                    this.lastSession = null;
+                                    this.showSessionBanner = true;
+                                    this.fetchActiveSession();
+                                }
                             })
                             .listen('.sensor.data.received', (e) => {
                                 this.latest = e.latest;
@@ -405,25 +492,15 @@
                             });
                     },
 
-                    async toggleDevice() {
-                        const newStatus = this.deviceOnline ? 'offline' : 'online';
-                        this.deviceOnline = newStatus === 'online';
+                    async fetchActiveSession() {
                         try {
-                            const res = await fetch('/nakes/device-status', {
-                                method: 'PATCH',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                },
-                                body: JSON.stringify({ status: newStatus }),
-                            });
+                            const res = await fetch('/api/devices');
                             const json = await res.json();
-                            if (!json.success) {
-                                this.deviceOnline = newStatus !== 'online';
+                            if (json.success && json.data.length > 0) {
+                                this.activeSession = json.data[0].active_session ?? null;
                             }
                         } catch (e) {
-                            this.deviceOnline = newStatus !== 'online';
-                            console.error('Error toggling device:', e);
+                            console.error('Error fetching active session:', e);
                         }
                     },
 

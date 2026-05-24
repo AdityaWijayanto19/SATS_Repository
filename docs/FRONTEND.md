@@ -35,12 +35,16 @@ resources/views/
     profile/
       edit.blade.php          # Edit profil (nama, email, password, foto avatar)
     nakes/
-      dashboard.blade.php     # Monitoring device (chart toggle terpisah/gabungan, vital sign, prediksi ML)
-      inputdata.blade.php     # Form input data pasien (belum ada backend)
-      laporan.blade.php       # Laporan medis + chart + filter tanggal
-      laporan-pdf.blade.php   # Template PDF laporan (DomPDF compatible)
+      dashboard.blade.php     # Monitoring device (chart toggle terpisah/gabungan, vital sign, prediksi ML, session banner)
+      inputdata.blade.php     # Form input data pasien (terhubung ke backend)
+      laporan.blade.php       # Laporan medis + AJAX session selection + modal input pasien
+      laporan-pdf.blade.php   # Template PDF laporan (DomPDF compatible, real data)
       instruksi.blade.php     # Chat instruksi dokter + laporan nakes (API-connected)
       monitoring.blade.php    # Halaman monitoring
+      partials/
+        _laporan-patient.blade.php   # Partial: identitas pasien + tombol input data
+        _laporan-content.blade.php   # Partial: ML banner, chart, vital signs, stats, tabel
+        _laporan-sidebar.blade.php   # Partial: info session + tombol download PDF
     dokter/
       dashboard.blade.php     # Monitoring device (chart toggle terpisah/gabungan, vital sign)
       inputdata.blade.php     # Form input data pasien (sama seperti nakes)
@@ -104,7 +108,9 @@ resources/views/
 |--------|--------------------------|--------------------|
 | GET    | `/nakes/dashboard`       | `dashboard`        |
 | GET    | `/nakes/input-data-pasien`| `input-data-pasien`|
+| POST   | `/nakes/input-data-pasien`| `input-data-pasien.store`|
 | GET    | `/nakes/laporan`         | `laporan.index`    |
+| GET    | `/nakes/laporan/session-data` | `laporan.session-data` (AJAX) |
 | GET    | `/nakes/laporan/pdf`     | `laporan.pdf`      |
 | GET    | `/nakes/instruksi`       | `nakes.instruksi`  |
 
@@ -135,13 +141,17 @@ resources/views/
 - [x] Halaman login + image slider
 - [x] Sistem auth (login, logout, forgot/reset password)
 - [x] Role middleware (nakes, dokter, superadmin)
-- [x] Dashboard nakes (realtime via WebSocket, zero polling)
-- [x] Input data pasien nakes (UI form, belum ada backend POST)
-- [x] Laporan nakes (HTML + PDF, data dummy)
+- [x] Dashboard nakes (realtime via WebSocket, zero polling, session banner)
+- [x] Input data pasien nakes (UI form + backend POST + link ke session)
+- [x] Input data pasien modal di halaman laporan (popup dengan background blur)
+- [x] Laporan nakes (real data dari monitoring_sessions + sensor_readings)
+- [x] AJAX session selection di laporan (tanpa refresh halaman)
+- [x] Partial views laporan (_laporan-patient, _laporan-content, _laporan-sidebar)
+- [x] Chart.js re-init setelah AJAX content swap
+- [x] Vital sign checkbox selection di laporan
 - [x] Navbar & sidebar nakes (termasuk menu Instruksi)
 - [x] Dashboard dokter (realtime via WebSocket, zero polling)
-- [x] Input data pasien dokter (UI form, sama seperti nakes)
-- [x] Laporan dokter (HTML + PDF, role-aware via LaporanController)
+- [x] Laporan dokter (real data, role-aware, read-only untuk data pasien)
 - [x] Halaman instruksi nakes (chat-style, laporan + konfirmasi instruksi dokter)
 - [x] Halaman instruksi dokter (chat-style, instruksi medis + pantau laporan nakes)
 - [x] Fitur instruksi dokter→nakes (terhubung ke API InstructionController)
@@ -176,14 +186,16 @@ resources/views/
 - [x] Chat: foto profil pengganti inisial role (DR/NK → foto avatar)
 - [x] Landing page + 7 section (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
 - [x] Activity log realtime via WebSocket (PrivateChannel + Alpine double-init fix)
+- [x] Dashboard nakes: fetchActiveSession() saat device online (tanpa refresh)
+- [x] PDF download dengan data real (DomPDF + QuickChart.io, nama file = nomor rekam medis)
 
 ### Belum Dikerjakan
-- [ ] Backend untuk input data pasien (POST route + controller)
 - [ ] Route untuk UserController (CRUD user belum terhubung ke UI)
-- [ ] Laporan dari database (masih dummy data)
+- [ ] Laporan superadmin dari database (masih dummy data)
 - [ ] Integrasi IoT real (simulator sudah ada, hardware belum)
 - [ ] Notifikasi instruksi terkirim (toast/snackbar)
 - [ ] Warning/highlight saat instruksi diselesaikan nakes
+- [ ] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun dari halaman login, inbox di dashboard superadmin (plan: `docs/plan-hubungi-superadmin.md`)
 
 ---
 
@@ -221,7 +233,7 @@ resources/views/
 - Navbar menampilkan nama user + role (dengan `ucfirst()`)
 - `LaporanController` sudah role-aware: cek `auth()->user()->role` untuk pilih view folder
 - `DashboardController` sudah support 3 role di `getViewByRole()`
-- Form input data pasien belum punya backend handler
+- Form input data pasien terhubung ke backend (PatientController + MonitoringSessionService)
 - Manajemen alat: CRUD sudah terhubung ke backend
 - Manajemen user: UI ada, backend ada, route terdaftar
 - Grafik di PDF laporan menggunakan QuickChart.io (curl, SSL verify disabled)
@@ -238,3 +250,7 @@ resources/views/
 - Landing page: 7 sections (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
 - Redis server wajib jalan untuk autentikasi API key device (middleware `AuthenticateApiKey`)
 - Redis tersedia di `redis_server/redis-server.exe`
+- AJAX laporan: partial HTML di-render server, Chart.js re-init setelah content swap
+- Alpine.js di partials: gunakan `onclick` global function (Alpine directives tidak work di innerHTML)
+- Alpine.js data passing: `window.__laporanInit` global variable (hindari `@json()` di atribut HTML)
+- Modal input pasien: di dalam scope `x-data` pada `<main>` (Alpine.js scope requirement)

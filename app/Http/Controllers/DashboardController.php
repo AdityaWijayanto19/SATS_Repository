@@ -7,6 +7,7 @@ use App\Events\DeviceStatusChangedGlobal;
 use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\Devices;
+use App\Models\MonitoringSession;
 use App\Models\NakesDeviceConfig;
 use App\Models\SensorData;
 use App\Models\User;
@@ -53,6 +54,13 @@ class DashboardController extends Controller
                 ->latest('created_at')
                 ->first();
 
+            // Get active session for this device
+            $activeSession = MonitoringSession::where('device_id', $device->device_id)
+                ->where('status', 'active')
+                ->with('patient')
+                ->latest('started_at')
+                ->first();
+
             return [
                 'device_id' => $device->device_id,
                 'status' => $device->status,
@@ -67,6 +75,12 @@ class DashboardController extends Controller
                     'ml_risk_level' => $device->ml_risk_level,
                     'ml_probabilities' => json_decode($device->ml_probabilities, true),
                     'ml_predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
+                ] : null,
+                'active_session' => $activeSession ? [
+                    'id' => $activeSession->id,
+                    'medical_record_number' => $activeSession->medical_record_number,
+                    'patient_name' => $activeSession->patient?->nama ?? '-',
+                    'started_at' => $activeSession->started_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
                 ] : null,
             ];
         })->filter(fn($d) => $d['latest'] !== null)->values();
@@ -138,7 +152,26 @@ class DashboardController extends Controller
 
     // Menampilkan halaman input data pasien
     public function viewInputDataPasienPage(){
-        return view($this->getViewByRole('inputdata'));
+        $devices = Devices::all()->map(function ($device) {
+            $activeSession = MonitoringSession::where('device_id', $device->device_id)
+                ->where('status', 'active')
+                ->with('patient')
+                ->latest('started_at')
+                ->first();
+
+            return [
+                'device_id' => $device->device_id,
+                'status' => $device->status,
+                'active_session' => $activeSession ? [
+                    'id' => $activeSession->id,
+                    'medical_record_number' => $activeSession->medical_record_number,
+                    'patient_name' => $activeSession->patient?->nama ?? '-',
+                    'started_at' => $activeSession->started_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
+                ] : null,
+            ];
+        });
+
+        return view($this->getViewByRole('inputdata'), compact('devices'));
     }
 
     // Menampilkan halaman laporan
@@ -311,6 +344,13 @@ class DashboardController extends Controller
                 ->orderBy('created_at', 'asc')
                 ->get();
 
+            // Get active session for this device
+            $activeSession = MonitoringSession::where('device_id', $device->device_id)
+                ->where('status', 'active')
+                ->with('patient')
+                ->latest('started_at')
+                ->first();
+
             return [
                 'device_id' => $device->device_id,
                 'status' => $device->status,
@@ -332,6 +372,12 @@ class DashboardController extends Controller
                     'spo2' => $history->pluck('spo2'),
                     'temperature' => $history->pluck('temperature'),
                 ],
+                'active_session' => $activeSession ? [
+                    'id' => $activeSession->id,
+                    'medical_record_number' => $activeSession->medical_record_number,
+                    'patient_name' => $activeSession->patient?->nama ?? '-',
+                    'started_at' => $activeSession->started_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
+                ] : null,
             ];
         })->values();
 

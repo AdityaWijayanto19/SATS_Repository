@@ -62,4 +62,16 @@ class Devices extends Model
     {
         return $this->belongsToMany(User::class, 'device_monitorings', 'device_id', 'dokter_id');
     }
+
+    public function monitoringSessions()
+    {
+        return $this->hasMany(MonitoringSession::class, 'device_id', 'device_id');
+    }
+
+    public function activeSession()
+    {
+        return $this->hasOne(MonitoringSession::class, 'device_id', 'device_id')
+            ->where('status', 'active')
+            ->latest('started_at');
+    }
 }

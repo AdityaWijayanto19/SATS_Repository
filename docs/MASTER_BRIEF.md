@@ -9,17 +9,24 @@
 ## Alur Sistem (End-to-End)
 
 ```
-[Perangkat IoT] --> [Sensor: Detak Jantung, SpO2, Suhu] --> [Pengiriman Data (MQTT/HTTP)]
+[Nakes Aktifkan Perangkat] --> [Monitoring Session Dibuat (auto-generate RM)]
         |
         v
-[Rule-Based Klasifikasi Kondisi] (di kode Arduino/IoT)
+[Perangkat IoT] --> [Sensor: HR, SpO2, Suhu] --> [HTTP POST ke API]
         |
         v
-[Web Dashboard Laravel] --> [Monitoring Real-Time]
-        |                    --> [Grafik Vital Sign]
-        |                    --> [Prediksi ML (rencana)]
+[Server: sensor_data (temporary)] --> [WebSocket Broadcast]
+        |                              --> [Dashboard Real-Time]
+        |                              --> [Prediksi ML (setiap 5 data)]
         v
-[Laporan Medis + PDF]
+[Nakes Matikan Perangkat] --> [Session Finalized]
+        |                     --> [sensor_data → sensor_readings]
+        |                     --> [sensor_data dihapus]
+        v
+[Nakes Input Data Pasien] --> [Link ke Session]
+        |
+        v
+[Laporan (AJAX)] --> [Pilih Sesi + Vital Sign] --> [Download PDF]
 ```
 
 ---
@@ -104,22 +111,28 @@
 - **Tabel:** `instructions` (device_id, dokter_id, nakes_id, instruksi_dokter, respon_nakes, laporan_nakes, is_completed)
 - **Bug fixes:** Duplikasi pesan (Reverb + API response), `toOthers()` removed, nested `template x-if` → `x-show`, device subscription untuk offline devices
 
-### 4. Input Data Pasien [UI SELESAI, BELUM ADA BACKEND]
+### 4. Input Data Pasien [TERHUBUNG KE BACKEND]
 
-- Form: No. Rekam Medis, Nama, NIK, Tgl Lahir, Jenis Kelamin, Penyakit/Alergi, Catatan
-- Tersedia di nakes, dokter, dan superadmin
-- **Belum ada POST handler di backend**
+- Form: Nama, NIK, Tgl Lahir, Umur, Jenis Kelamin, Penyakit/Alergi, Catatan
+- Nomor rekam medis auto-generate: `RM-{DEVICE_ID}-{YYYYMMDD}-{SEQ}`
+- **Backend: `PatientController::store()` + `MonitoringSessionService::linkPatient()`**
+- Tersedia di halaman input-data-pasien dan modal popup di halaman laporan
+- Data pasien di-link ke active monitoring session
 
-### 5. Laporan Medis Nakes & Dokter [UI SELESAI, DATA DUMMY]
+### 5. Laporan Medis Nakes & Dokter [TERHUBUNG KE DATABASE]
 
-- Identitas pasien, banner prediksi ML
-- Grafik tekanan darah (sistolik/diastolik)
-- Nilai vital (heart rate, SpO2)
-- Hasil klasifikasi ML (Normal/Warning/Critical)
-- Tabel riwayat kondisi pasien
-- Filter rentang tanggal
-- Download PDF (via DomPDF + QuickChart.io)
-- `LaporanController` sudah role-aware (cek `auth()->user()->role`)
+- Identitas pasien dari `patients` table (via monitoring session)
+- Banner prediksi ML
+- Grafik vital signs (Chart.js) — re-init setelah AJAX load
+- Nilai vital (heart rate, SpO2, temperature) + statistik (avg, min, max)
+- **AJAX session selection** — dropdown sesi, load data tanpa refresh halaman
+- **Vital sign checkbox** — pilih vital sign yang ditampilkan
+- **Partial views** — `_laporan-patient`, `_laporan-content`, `_laporan-sidebar`
+- **Input Data Pasien modal** — popup dengan background blur putih
+- Tabel riwayat sensor readings
+- Download PDF dengan data real (DomPDF + QuickChart.io, nama file = nomor rekam medis)
+- `LaporanController` + `ReportService` — real data dari `monitoring_sessions` + `sensor_readings`
+- Dokter: read-only (tidak bisa edit data pasien)
 
 ### 6. Dashboard Superadmin [TERHUBUNG KE BACKEND]
 
@@ -195,27 +208,29 @@
 ### 11. Backend & Database [SEBAGIAN BESAR SELESAI]
 
 **Sudah ada:**
-- 12 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, activity_log, instructions, cache, jobs, add_photo_to_users)
-- 9 model Eloquent dengan relasi: User, Devices, SensorData, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction
-- 6 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService, PatientMonitoringService
+- 15 migrasi (users, devices, sensor_datas, sensor_readings, system_statuses, api_keys, patients, medical_records, activity_log, instructions, monitoring_sessions, nakes_device_configs, device_monitorings, cache, jobs, add_photo_to_users)
+- 13 model Eloquent: User, Devices, SensorData, SensorReading, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction, MonitoringSession, NakesDeviceConfig, DeviceMonitoring
+- 8 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService, PatientMonitoringService, MonitoringSessionService, ReportService
 - `ProfileController` untuk edit profil user
+- `PatientController` untuk input data pasien + link ke session
 - 11 form request validation
-- 3 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
-- 1 event class: ActivityLogCreated (ShouldBroadcastNow, broadcast activity log real-time)
+- 4 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted, ActivityLogCreated
 - 16 activity log events: user login/logout, password reset, device online/offline/added/deleted, monitoring started/stopped, patient warning/critical, instruction sent/completed, user added/deleted
 - 2 job class: ProcessDeviceData, ProcessSensorData
 - API sensor data (POST, GET latest, GET history)
 - API instruksi (GET, POST, POST report, PATCH update, PATCH complete)
-- API device list (`/api/devices`)
+- API device list (`/api/devices` — termasuk active_session)
 - API system status (POST, GET)
+- API laporan AJAX (`GET /nakes/laporan/session-data`)
+- API input data pasien (`POST /nakes/input-data-pasien`)
 - Autentikasi device via API key
 - Queue & broadcasting infrastructure (Redis + Reverb)
 - Seeder: 3 user + 2 device + 2 API key
+- Monitoring session system (auto-create ON, finalize OFF, auto-generate RM)
 - Dokumentasi: [DATABASE.md](DATABASE.md), [BACKEND.md](BACKEND.md)
 
 **Belum ada:**
-- Backend input data pasien (POST handler)
-- Laporan dari database (masih dummy data)
+- Laporan superadmin dari database (masih dummy data)
 - Device config dari database (masih hardcoded)
 
 ### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
@@ -277,12 +292,14 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 - [ ] Notifikasi realtime (broadcasting via Reverb sudah ada, perlu listener di frontend)
 
 ### Prioritas 3 — Backend yang Belum Selesai
-- [ ] Backend input data pasien (POST route + controller → tabel `patients`)
+- [x] Backend input data pasien (POST route + controller → tabel `patients`)
 - [x] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
-- [ ] Aktifkan query database di LaporanController (ganti dummy data)
+- [x] Aktifkan query database di LaporanController (ganti dummy data) → real data via ReportService
 - [ ] Aktifkan query database di SuperadminLaporanController (ganti dummy data)
 - [ ] Device config dari database (ganti hardcoded)
 - [x] Activity log: 16 event types sudah terinstrumentasi
+- [x] Monitoring session system (auto-create ON, finalize OFF, auto-generate RM)
+- [ ] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun (guest), inbox superadmin (plan: `docs/plan-hubungi-superadmin.md`)
 
 ### Prioritas 4 — Integrasi & Testing
 - [ ] Testing dengan hardware IoT real
@@ -307,11 +324,12 @@ app/Http/Controllers/
   DashboardController.php         # Role-based view resolver + API device list
   UserController.php              # CRUD user (superadmin)
   ManajemenAlatController.php     # CRUD perangkat IoT (superadmin)
-  LaporanController.php           # Laporan HTML + PDF nakes/dokter (role-aware)
+  LaporanController.php           # Laporan HTML + PDF nakes/dokter (real data + AJAX)
   SuperadminLaporanController.php # Laporan HTML + PDF superadmin
+  PatientController.php           # Input data pasien + link ke monitoring session
   ProfileController.php           # Edit profil user (nama, email, password, foto)
   Api/
-    DeviceDataController.php      # Autentikasi device, system status, device config
+    DeviceDataController.php      # Autentikasi device, system status, session lifecycle
     SensorDataController.php      # Sensor data endpoint (store, latest, history)
     InstructionController.php     # Instruksi dokter-nakes (CRUD + report + complete)
 
@@ -320,7 +338,9 @@ app/Services/
   DeviceService.php               # Sensor data CRUD + caching
   UserService.php                 # User CRUD
   InstructionService.php          # Instruksi dokter-nakes business logic
-  SensorService.php               # Sensor data operations + caching
+  SensorService.php               # Sensor data operations + caching + trigger ML
+  MonitoringSessionService.php    # Session lifecycle: create, finalize, link patient
+  ReportService.php               # Report data: getReportData, getChart, getStats
 
 app/Events/
   InstructionSent.php             # Broadcast saat dokter kirim instruksi
@@ -338,14 +358,18 @@ app/Http/Middleware/
 
 app/Models/
   User.php                        # users
-  Devices.php                     # devices (PK: device_id string)
-  SensorData.php                  # sensor_datas
+  Devices.php                     # devices (PK: device_id string, ML fields)
+  SensorData.php                  # sensor_datas (temporary, realtime dashboard)
+  SensorReading.php               # sensor_readings (finalized, untuk laporan)
   SystemStatus.php                # system_statuses
   ApiKey.php                      # api_keys
   Patient.php                     # patients
   MedicalRecord.php               # medical_records
   ActivityLog.php                 # activity_log
   Instruction.php                 # instructions
+  MonitoringSession.php           # monitoring_sessions
+  NakesDeviceConfig.php           # nakes_device_configs
+  DeviceMonitoring.php            # device_monitorings
 
 database/seeders/
   UserSeeder.php                  # 3 akun: superadmin, dokter, nakes
@@ -385,16 +409,20 @@ resources/views/
         faq.blade.php             # Section FAQ (accordion)
         closing.blade.php         # Section CTA
     nakes/
-      dashboard.blade.php         # Monitoring vital sign + chart toggle (API-connected)
-      inputdata.blade.php         # Form input pasien
-      laporan.blade.php           # Laporan medis + chart
-      laporan-pdf.blade.php       # Template PDF
+      dashboard.blade.php         # Monitoring vital sign + chart toggle + session banner
+      inputdata.blade.php         # Form input pasien (terhubung ke backend)
+      laporan.blade.php           # Laporan medis + AJAX session + modal input pasien
+      laporan-pdf.blade.php       # Template PDF (real data)
       instruksi.blade.php         # Chat instruksi dokter + laporan nakes (API-connected)
+      partials/
+        _laporan-patient.blade.php   # Identitas pasien + tombol input data
+        _laporan-content.blade.php   # ML banner, chart, vital signs, stats, tabel
+        _laporan-sidebar.blade.php   # Info session + tombol download PDF
     dokter/
       dashboard.blade.php         # Monitoring vital sign + chart toggle (API-connected)
       inputdata.blade.php         # Form input pasien
-      laporan.blade.php           # Laporan medis + chart
-      laporan-pdf.blade.php       # Template PDF
+      laporan.blade.php           # Laporan medis + AJAX session (read-only)
+      laporan-pdf.blade.php       # Template PDF (real data)
       instruksi.blade.php         # Chat instruksi medis + pantau laporan nakes (API-connected)
     superadmin/
       dashboard.blade.php         # Stat cards, tabel kritis, log aktivitas
@@ -611,33 +639,39 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 Nakes memasang perangkat pada pasien
         |
         v
-Perangkat dinyalakan (via perangkat / dashboard monitoring)
+Nakes mengaktifkan perangkat (toggle ON di dashboard)
+        |--- Monitoring session otomatis dibuat (status: active)
+        |--- Nomor rekam medis auto-generate: RM-{DEVICE}-{DATE}-{SEQ}
+        |--- Dashboard menampilkan banner session aktif
         |
         v
-Perangkat mulai mengambil data sensor & mengirim ke database
-        |--- data masuk ke tabel sensor_data
-        |--- data ditampilkan real-time di dashboard
+Perangkat mulai mengirim data sensor setiap 1-2 detik
+        |--- data masuk ke tabel sensor_data (temporary)
+        |--- data ditampilkan real-time di dashboard (WebSocket)
+        |--- prediksi ML trigger setiap 5 data baru
         |
         v
-Nakes di RS tujuan memantau kondisi pasien via dashboard
+Nakes input data pasien (opsional, bisa kapan saja)
+        |--- dari halaman input-data-pasien atau modal di laporan
+        |--- data pasien di-link ke active session
         |
         v
-Pasien tiba di RS tujuan --> Nakes mematikan perangkat
-        |--- perintah "stop" masuk ke tabel commands
+Pasien tiba di RS tujuan --> Nakes mematikan perangkat (toggle OFF)
+        |--- Session masuk status: completed
+        |--- sensor_data di-copy ke sensor_readings (finalized)
+        |--- SEMUA sensor_data untuk device dihapus
         |
         v
-Nakes di ambulans menginput data pasien
-        |--- data masuk ke tabel patients
+Nakes buka halaman laporan
+        |--- Pilih sesi dari dropdown (AJAX, tanpa refresh)
+        |--- Pilih vital sign yang ditampilkan (checkbox)
+        |--- Lihat identitas pasien, grafik, statistik, tabel riwayat
         |
         v
-Nakes melakukan cross-check di menu laporan
-        |--- pilih rentang tanggal/jam atau data vital terbaru
-        |
-        v
-Rekam medis ter-generate otomatis
-        |--- no rekam medis muncul di laporan
-        |--- data tersimpan di tabel medical_records
-        |--- laporan siap diunduh sebagai PDF
+Download PDF laporan
+        |--- Nama file: Laporan-{nomor_rekam_medis}-{tanggal}.pdf
+        |--- Data real dari sensor_readings + patients
+        |--- Grafik via QuickChart.io
 ```
 
 ---
@@ -650,7 +684,8 @@ Rekam medis ter-generate otomatis
 - [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
 - [BACKEND.md](BACKEND.md) - Detail progress backend, API endpoints, service layer, dan simulator
 - [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
+- [LAPORAN_SYSTEM.md](LAPORAN_SYSTEM.md) - Desain sistem laporan, monitoring session, dan filterisasi data
 
 ---
 
-*Last updated: 24 Mei 2026*
+*Last updated: 24 Mei 2026 (monitoring session, laporan real data, AJAX, input pasien)*

@@ -25,42 +25,53 @@
                 </div>
             @endif
 
-            <form method="POST" class="space-y-5">
+            <form method="POST" action="{{ route('input-data-pasien.store') }}" class="space-y-5">
                 @csrf
 
-                <!-- No. Rekam Medis -->
-                <div>
-                    <label for="no_rekam_medis" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
-                        No. Rekam Medis
-                    </label>
-                    <input
-                        type="text"
-                        id="no_rekam_medis"
-                        name="no_rekam_medis"
-                        value="{{ old('no_rekam_medis') }}"
-                        placeholder="Masukkan nomor rekam medis"
-                        class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition"
-                    />
-                    @error('no_rekam_medis')
-                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
+                <!-- Hidden device_id (from active session device) -->
+                @php
+                    $activeDevice = $devices->firstWhere('status', 'online');
+                    $deviceId = is_array($activeDevice) ? ($activeDevice['device_id'] ?? '') : ($activeDevice?->device_id ?? '');
+                    $activeSession = is_array($activeDevice) ? ($activeDevice['active_session'] ?? null) : ($activeDevice?->active_session ?? null);
+                @endphp
+                <input type="hidden" name="device_id" value="{{ $deviceId }}" />
+
+                @if($activeSession)
+                    <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                        <span class="font-medium">Sesi Monitoring Aktif:</span>
+                        {{ $activeSession['medical_record_number'] ?? '-' }}
+                        @if($activeSession['patient_name'] ?? false)
+                            — {{ $activeSession['patient_name'] }}
+                        @endif
+                    </div>
+                @elseif($activeDevice)
+                    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                        <span class="font-medium">Perangkat aktif:</span> {{ $activeDevice['device_id'] }}
+                        — Belum ada sesi monitoring. Data pasien akan otomatis terhubung saat sesi dimulai.
+                    </div>
+                @else
+                    <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                        <span class="font-medium">Perhatian:</span> Tidak ada perangkat yang aktif.
+                        Aktifkan perangkat terlebih dahulu sebelum menginput data pasien.
+                    </div>
+                @endif
 
                 <!-- Nama Lengkap & NIK -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                        <label for="nama_lengkap" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
-                            Nama Lengkap Pasien
+                        <label for="nama" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
+                            Nama Lengkap Pasien <span class="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
-                            id="nama_lengkap"
-                            name="nama_lengkap"
-                            value="{{ old('nama_lengkap') }}"
+                            id="nama"
+                            name="nama"
+                            value="{{ old('nama') }}"
                             placeholder="Masukkan nama lengkap"
+                            required
                             class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition"
                         />
-                        @error('nama_lengkap')
+                        @error('nama')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
@@ -84,8 +95,8 @@
                     </div>
                 </div>
 
-                <!-- Tanggal Lahir & Jenis Kelamin -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Tanggal Lahir, Umur & Jenis Kelamin -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div>
                         <label for="tanggal_lahir" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
                             Tanggal Lahir
@@ -103,12 +114,33 @@
                     </div>
 
                     <div>
+                        <label for="umur" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
+                            Umur <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            id="umur"
+                            name="umur"
+                            value="{{ old('umur') }}"
+                            placeholder="Umur dalam tahun"
+                            min="0"
+                            max="150"
+                            required
+                            class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition"
+                        />
+                        @error('umur')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
                         <label for="jenis_kelamin" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
-                            Jenis Kelamin
+                            Jenis Kelamin <span class="text-red-500">*</span>
                         </label>
                         <select
                             id="jenis_kelamin"
                             name="jenis_kelamin"
+                            required
                             class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition appearance-none cursor-pointer"
                         >
                             <option value="" disabled {{ old('jenis_kelamin') ? '' : 'selected' }}>Pilih jenis kelamin</option>
