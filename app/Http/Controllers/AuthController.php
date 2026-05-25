@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\ForgotPasswordRequest;
 use App\Http\Requests\ResetPasswordRequest;
+use App\Models\ActivityLog;
 use App\Services\AuthService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
@@ -47,6 +48,12 @@ class AuthController extends Controller
 
         $result = $this->authService->login($credentials, $request);
 
+        // Update last_activity saat login
+        $user = Auth::user();
+        $user->update(['last_activity' => now()]);
+
+        ActivityLog::log('user.login', "{$user->name} berhasil login", $user->name, $user->role);
+
         return redirect()->intended($result['redirect']);
     }
 
@@ -68,6 +75,8 @@ class AuthController extends Controller
         if (!$emailSent) {
             return back()->with('error', 'Gagal mengirim email. Coba lagi.');
         }
+
+        ActivityLog::log('password.reset_request', "Reset password diminta untuk {$request->email}");
 
         return back()->with('success', 'Link reset password telah dikirim ke email Anda.');
     }
@@ -111,6 +120,8 @@ class AuthController extends Controller
                 ->with('error', $result['message']);
         }
 
+        ActivityLog::log('password.reset_success', "Password berhasil direset untuk {$request->email}");
+
         return redirect()
             ->route('login')
             ->with('success', $result['message']);
@@ -118,6 +129,11 @@ class AuthController extends Controller
     
     public function logout(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user) {
+            ActivityLog::log('user.logout', "{$user->name} logout dari sistem", $user->name, $user->role);
+        }
+
         $this->authService->logout($request);
 
         return redirect()

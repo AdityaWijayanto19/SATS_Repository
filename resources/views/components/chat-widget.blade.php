@@ -4,7 +4,11 @@
     - Expanded: chat panel with messages + input
     - Both nakes and dokter can send messages
 --}}
-@php $role = auth()->user()->role; @endphp
+@php
+    $user = auth()->user();
+    $role = $user->role;
+    $currentUserPhoto = $user->photo ? asset($user->photo) : null;
+@endphp
 
 <div x-data="chatWidget()" x-init="init()" class="fixed bottom-6 right-6 z-[9999]" style="font-family: inherit;">
 
@@ -74,11 +78,25 @@
                 <template x-for="item in sortedInstruksi" :key="item.id">
                     <div class="flex flex-col gap-2">
 
-                        {{-- Laporan/pesan dari nakes (right side) --}}
-                        <div class="flex justify-end" x-show="item.laporan_nakes && item.laporan_nakes !== '-'">
-                            <div class="max-w-[80%] bg-[rgb(0,83,63)] text-white p-3 rounded-2xl rounded-tr-none text-sm shadow-md">
-                                <p x-text="item.laporan_nakes" class="text-[13px]"></p>
-                                <span class="text-[9px] opacity-60 block mt-1 text-right" x-text="item.waktu"></span>
+                        {{-- Laporan/pesan dari nakes --}}
+                        <div x-show="item.laporan_nakes && item.laporan_nakes !== '-'"
+                            :class="role === 'nakes' ? 'flex justify-end' : 'flex justify-start items-end gap-2'">
+
+                            <div x-show="role === 'dokter'" class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                <template x-if="item.nakes_photo">
+                                    <img :src="'/' + item.nakes_photo" alt="Nakes" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!item.nakes_photo">
+                                    <span class="text-[9px] font-bold text-blue-700">NK</span>
+                                </template>
+                            </div>
+
+                            <div :class="role === 'nakes'
+                                ? 'max-w-[80%] bg-[rgb(0,83,63)] text-white p-3 rounded-2xl rounded-tr-none text-sm shadow-md'
+                                : 'max-w-[80%] bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm'">
+                                <p x-show="role === 'dokter'" class="text-[10px] font-bold text-blue-800 mb-1" x-text="item.nakes_name || 'NAKES'"></p>
+                                <p x-text="item.laporan_nakes" class="text-[13px]" :class="role === 'dokter' ? 'text-gray-800' : ''"></p>
+                                <span class="text-[9px] opacity-60 block mt-1 text-right" :class="role === 'dokter' ? 'text-gray-400' : ''" x-text="item.waktu"></span>
                             </div>
                         </div>
 
@@ -86,7 +104,14 @@
                         <div x-show="item.instruksi_dokter"
                             :class="role === 'nakes' ? 'flex justify-start items-end gap-2' : 'flex justify-end'">
 
-                            <div x-show="role === 'nakes'" class="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0">DR</div>
+                            <div x-show="role === 'nakes'" class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                <template x-if="item.user_photo">
+                                    <img :src="'/' + item.user_photo" alt="Dokter" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!item.user_photo">
+                                    <span class="text-[9px] font-bold text-emerald-700">DR</span>
+                                </template>
+                            </div>
 
                             <div x-show="item.instruksi_dokter"
                                 :class="role === 'nakes'
@@ -188,6 +213,7 @@
         return {
             isOpen: false,
             role: '{{ $role }}',
+            currentUserPhoto: @json($currentUserPhoto),
             instruksi: [],
             teksBaru: '',
             isSending: false,

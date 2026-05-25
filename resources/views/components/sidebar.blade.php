@@ -23,14 +23,14 @@
     {{-- Header --}}
     <div class="flex items-center h-18 pl-5 px-4 flex-shrink-0" :class="sidebarOpen ? 'justify-between' : 'justify-center'">
         {{-- Logo --}}
-        <div x-show="sidebarOpen" style="display: none;" class="flex items-center gap-2 overflow-hidden">
+        <a href="{{ url('/') }}" x-show="sidebarOpen" style="display: none;" class="flex items-center gap-2 overflow-hidden hover:opacity-80 transition-opacity">
             <!-- <img src="{{ asset('assets/logo.png') }}" class="w-10 h-10 object-contain flex-shrink-0"> -->
             <span class="text-white font-semibold text-base whitespace-nowrap">SATS <br>
                 <span class="text-xs font-normal">
                     Monitoring Sidebar
                 </span>
             </span>
-        </div>
+        </a>
 
         {{-- Toggle Button --}}
         <button
@@ -119,6 +119,14 @@
                         'route' => route('dokter.laporan'),
                         'routeIs' => 'dokter.laporan',
                         'icon' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 13h8v1.5H8V13zm0 3h8v1.5H8V16zm0-6h3v1.5H8V10z"/>',
+                        'children' => [],
+                    ],
+                    [
+                        'key' => 'rekam-medis',
+                        'label' => 'Rekam Medis',
+                        'route' => route('dokter.rekam-medis'),
+                        'routeIs' => 'dokter.rekam-medis',
+                        'icon' => '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>',
                         'children' => [],
                     ],
                 ];

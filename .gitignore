@@ -27,3 +27,4 @@ simulasi_py/devices.json
 .claude/
 dump.rdb
 redis_server/
+simulasi_py/.venv/

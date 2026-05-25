@@ -2,60 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\MonitoringSession;
+use App\Models\NakesDeviceConfig;
+use App\Services\MonitoringSessionService;
+use App\Services\ReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
-// use App\Models\Pasien;
-// use App\Models\VitalSign;
-// use App\Models\RiwayatKondisi;
+use Illuminate\Http\Request;
 
 class LaporanController extends Controller
 {
+    public function __construct(
+        protected ReportService $reportService,
+        protected MonitoringSessionService $sessionService
+    ) {}
+
     /**
      * Halaman preview laporan (tampil di browser).
      */
     public function index(Request $request)
     {
-        $pasienId = $request->get('pasien_id', 1);
-        $dari     = $request->get('dari', now()->subDays(7)->toDateString());
-        $sampai   = $request->get('sampai', now()->toDateString());
+        $user = auth()->user();
+        $sessionId = $request->get('session_id');
+        $vitalSigns = $request->get('vital_signs', ['heart_rate', 'spo2', 'temperature']);
 
-        // ── Ambil data dari database ──────────────────────────────
-        // $pasien        = Pasien::findOrFail($pasienId);
-        // $vitalTerbaru  = VitalSign::where('pasien_id', $pasienId)->latest()->first();
-        // $riwayat       = RiwayatKondisi::where('pasien_id', $pasienId)
-        //                     ->whereBetween('waktu', [$dari . ' 00:00:00', $sampai . ' 23:59:59'])
-        //                     ->orderBy('waktu')->get();
-        // $labelGrafik   = $vitalSigns->pluck('kode')->toArray();
-        // $dataSistolik  = $vitalSigns->pluck('sistolik')->toArray();
-        // $dataDiastolik = $vitalSigns->pluck('diastolik')->toArray();
+        // Auto-detect device based on role
+        $deviceId = null;
+        $monitoredDevices = collect();
 
-        // ── Data dummy (hapus setelah DB tersambung) ──────────────
-        $pasien        = null;
-        $vitalTerbaru  = null;
-        $riwayat       = [];
-        $labelGrafik   = ['PM001','PM002','PM003','PM004','PM005','PM006','PM007','PM008','PM009','PM010'];
-        $dataSistolik  = [130,125,135,128,140,132,138,126,134,129];
-        $dataDiastolik = [82,78,85,80,88,83,86,79,84,81];
+        if ($user->role === 'nakes') {
+            // Nakes: get device from their config
+            $nakesConfig = NakesDeviceConfig::where('user_id', $user->id)->first();
+            $deviceId = $nakesConfig?->device_id;
+        } elseif ($user->role === 'dokter') {
+            // Dokter: get devices they are monitoring
+            $monitoredDevices = \App\Models\DeviceMonitoring::where('dokter_id', $user->id)
+                ->with('device')
+                ->get()
+                ->pluck('device');
 
-        // ── Prediksi ML ───────────────────────────────────────────
-        // TODO: Ganti dengan data dari endpoint ML, misal:
-        // $prediksi = Http::get("/api/device/{$pasienId}/prediction")->object();
-        $prediksi = (object)[
-            'risk_level'        => 'warning',
-            'risk_percent'      => 20,
+            // Use first device or selected device
+            $deviceId = $request->get('device_id') ?? $monitoredDevices->first()?->device_id;
+        }
+
+        // Get completed sessions for this device
+        $sessions = collect();
+        if ($deviceId) {
+            $sessions = $this->sessionService->getCompletedSessionsForDevice($deviceId);
+        }
+
+        // Get report data if session selected
+        $session = null;
+        $patient = null;
+        $chartData = null;
+        $latestReading = null;
+        $stats = null;
+
+        if ($sessionId) {
+            $session = $this->reportService->getReportData($sessionId, $vitalSigns);
+            $patient = $session->patient;
+            $chartData = $this->reportService->getHistoryForChart($sessionId, $vitalSigns);
+            $latestReading = $this->reportService->getLatestReading($sessionId);
+            $stats = $this->reportService->getSessionStats($sessionId);
+        }
+
+        // ML prediction (TODO: replace with real ML endpoint)
+        $prediksi = (object) [
+            'risk_level' => 'warning',
+            'risk_percent' => 20,
             'timeframe_minutes' => 15,
-            'message'           => 'Kondisi pasien berpotensi memburuk 20% dalam 15 menit ke depan berdasarkan tren Heart Rate dan SpO2.',
+            'message' => 'Kondisi pasien berpotensi memburuk 20% dalam 15 menit ke depan berdasarkan tren Heart Rate dan SpO2.',
         ];
 
-        $role = auth()->user()->role;
+        $role = $user->role;
         $viewFolder = $role === 'dokter' ? 'pages.dokter' : 'pages.nakes';
 
         return view($viewFolder . '.laporan', compact(
-            'pasien', 'vitalTerbaru', 'riwayat',
-            'dari', 'sampai',
-            'labelGrafik', 'dataSistolik', 'dataDiastolik',
-            'prediksi'
+            'session', 'patient', 'sessions', 'chartData',
+            'latestReading', 'stats', 'deviceId', 'sessionId',
+            'vitalSigns', 'prediksi', 'monitoredDevices'
         ));
+    }
+
+    /**
+     * API: Get session data as JSON for AJAX updates.
+     */
+    public function sessionData(Request $request)
+    {
+        $sessionId = $request->get('session_id');
+        $vitalSigns = $request->get('vital_signs', ['heart_rate', 'spo2', 'temperature']);
+
+        if (!$sessionId) {
+            return response()->json(['error' => 'Session ID required'], 400);
+        }
+
+        $session = $this->reportService->getReportData($sessionId, $vitalSigns);
+        $patient = $session->patient;
+        $chartData = $this->reportService->getHistoryForChart($sessionId, $vitalSigns);
+        $latestReading = $this->reportService->getLatestReading($sessionId);
+        $stats = $this->reportService->getSessionStats($sessionId);
+
+        // Render partials
+        $patientHtml = view('pages.nakes.partials._laporan-patient', compact('session', 'patient'))->render();
+        $contentHtml = view('pages.nakes.partials._laporan-content', compact('session', 'patient', 'chartData', 'latestReading', 'stats', 'vitalSigns'))->render();
+        $sidebarHtml = view('pages.nakes.partials._laporan-sidebar', compact('session', 'vitalSigns'))->render();
+
+        return response()->json([
+            'patient' => $patient,
+            'chartData' => $chartData,
+            'latestReading' => $latestReading,
+            'stats' => $stats,
+            'patientHtml' => $patientHtml,
+            'contentHtml' => $contentHtml,
+            'sidebarHtml' => $sidebarHtml,
+            'sessionInfo' => [
+                'id' => $session->id,
+                'medical_record_number' => $session->medical_record_number,
+                'started_at' => $session->started_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
+                'ended_at' => $session->ended_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i'),
+                'total_readings' => $session->total_readings,
+            ],
+        ]);
     }
 
     /**
@@ -63,93 +129,88 @@ class LaporanController extends Controller
      */
     public function pdf(Request $request)
     {
-        $pasienId = $request->get('pasien_id', 1);
-        $dari     = $request->get('dari', now()->subDays(7)->toDateString());
-        $sampai   = $request->get('sampai', now()->toDateString());
+        $sessionId = $request->get('session_id');
+        $vitalSigns = $request->get('vital_signs', ['heart_rate', 'spo2', 'temperature']);
 
-        // ── Ambil data dari database ──────────────────────────────
-        // $pasien       = Pasien::findOrFail($pasienId);
-        // $vitalTerbaru = VitalSign::where('pasien_id', $pasienId)->latest()->first();
-        // $riwayat      = RiwayatKondisi::where('pasien_id', $pasienId)
-        //                     ->whereBetween('waktu', [$dari.' 00:00:00', $sampai.' 23:59:59'])
-        //                     ->orderBy('waktu')->get();
-        // $sistolik     = VitalSign::where('pasien_id', $pasienId)->pluck('sistolik')->toArray();
-        // $diastolik    = VitalSign::where('pasien_id', $pasienId)->pluck('diastolik')->toArray();
-        // $labels       = VitalSign::where('pasien_id', $pasienId)->pluck('kode')->toArray();
+        if (!$sessionId) {
+            abort(400, 'Session ID diperlukan untuk generate PDF.');
+        }
 
-        // ── Data dummy ─────────────────────────────────────────────
-        $pasien       = null;
-        $vitalTerbaru = null;
-        $riwayat      = [];
-        $sistolik     = [130,125,135,128,140,132,138,126,134,129];
-        $diastolik    = [82,78,85,80,88,83,86,79,84,81];
-        $labels       = ['PM001','PM002','PM003','PM004','PM005','PM006','PM007','PM008','PM009','PM010'];
+        $session = $this->reportService->getReportData($sessionId, $vitalSigns);
+        $patient = $session->patient;
+        $chartData = $this->reportService->getHistoryForChart($sessionId, $vitalSigns);
+        $latestReading = $this->reportService->getLatestReading($sessionId);
+        $stats = $this->reportService->getSessionStats($sessionId);
 
-        // ── Prediksi ML ───────────────────────────────────────────
-        // TODO: Ganti dengan data dari endpoint ML
-        $prediksi = (object)[
-            'risk_level'        => 'warning',
-            'risk_percent'      => 20,
+        // ML prediction (TODO: replace with real ML endpoint)
+        $prediksi = (object) [
+            'risk_level' => 'warning',
+            'risk_percent' => 20,
             'timeframe_minutes' => 15,
-            'message'           => 'Kondisi pasien berpotensi memburuk 20% dalam 15 menit ke depan berdasarkan tren Heart Rate dan SpO2.',
+            'message' => 'Kondisi pasien berpotensi memburuk 20% dalam 15 menit ke depan berdasarkan tren Heart Rate dan SpO2.',
         ];
 
-        // ── Generate grafik via QuickChart.io ─────────────────────
-        $grafikBase64 = $this->generateChartBase64($labels, $sistolik, $diastolik);
+        // Generate chart
+        $grafikBase64 = $this->generateChartBase64($chartData, $vitalSigns);
 
         $role = auth()->user()->role;
         $viewFolder = $role === 'dokter' ? 'pages.dokter' : 'pages.nakes';
 
         $pdf = Pdf::loadView($viewFolder . '/laporan-pdf', compact(
-            'pasien', 'vitalTerbaru', 'riwayat',
-            'dari', 'sampai', 'grafikBase64',
-            'prediksi'
+            'session', 'patient', 'chartData', 'latestReading',
+            'stats', 'grafikBase64', 'vitalSigns', 'prediksi'
         ))->setPaper('a4', 'portrait');
 
-        $namaFile = 'Laporan_' . ($pasien->no_rekam_medis ?? '24E56') . '_' . now()->format('Ymd') . '.pdf';
+        $namaFile = 'Laporan_' . ($session->medical_record_number ?? 'Unknown') . '_' . now()->format('Ymd') . '.pdf';
 
         return $pdf->stream($namaFile);
     }
 
     /**
-     * Ambil grafik sebagai base64 PNG via QuickChart.io.
+     * Generate chart as base64 PNG via QuickChart.io.
      */
-    private function generateChartBase64(array $labels, array $sistolik, array $diastolik): ?string
+    private function generateChartBase64(array $chartData, array $vitalSigns): ?string
     {
+        $colors = [
+            'heart_rate' => ['rgb(220,38,38)', 'Heart Rate (bpm)'],
+            'spo2' => ['rgb(59,130,246)', 'SpO2 (%)'],
+            'temperature' => ['rgb(234,179,8)', 'Suhu (°C)'],
+        ];
+
+        $datasets = [];
+        foreach ($vitalSigns as $sign) {
+            if (isset($chartData['datasets'][$sign]) && isset($colors[$sign])) {
+                $datasets[] = [
+                    'label' => $colors[$sign][1],
+                    'data' => $chartData['datasets'][$sign],
+                    'borderColor' => $colors[$sign][0],
+                    'borderWidth' => 2,
+                    'pointRadius' => 2,
+                    'tension' => 0.4,
+                    'fill' => false,
+                ];
+            }
+        }
+
+        if (empty($datasets)) {
+            return null;
+        }
+
         $chartConfig = [
             'type' => 'line',
             'data' => [
-                'labels'   => $labels,
-                'datasets' => [
-                    [
-                        'label'       => 'Sistolik',
-                        'data'        => $sistolik,
-                        'borderColor' => 'rgb(220,38,38)',
-                        'borderWidth' => 2,
-                        'pointRadius' => 3,
-                        'tension'     => 0.4,
-                        'fill'        => false,
-                    ],
-                    [
-                        'label'       => 'Diastolik',
-                        'data'        => $diastolik,
-                        'borderColor' => 'rgb(59,130,246)',
-                        'borderWidth' => 2,
-                        'pointRadius' => 3,
-                        'tension'     => 0.4,
-                        'fill'        => false,
-                    ],
-                ],
+                'labels' => $chartData['labels'],
+                'datasets' => $datasets,
             ],
             'options' => [
                 'plugins' => ['legend' => ['display' => true]],
-                'scales'  => [
-                    'y' => ['title' => ['display' => true, 'text' => 'Tekanan (mmHg)']],
+                'scales' => [
+                    'y' => ['title' => ['display' => true, 'text' => 'Nilai']],
                 ],
             ],
         ];
 
-        $url = 'https://quickchart.io/chart?c=' . urlencode(json_encode($chartConfig)) . '&w=500&h=200&bkg=white';
+        $url = 'https://quickchart.io/chart?c=' . urlencode(json_encode($chartConfig)) . '&w=600&h=250&bkg=white';
 
         try {
             $ch = curl_init();

@@ -24,6 +24,8 @@ Route::prefix('device')->middleware(['apikey', 'throttle.api', /* 'sign.verify' 
     Route::prefix('/{device_id}/system-status')->group(function () {
         Route::post('/', [DeviceDataController::class, 'storeSystemStatus'])->middleware('idempotent');
     });
+
+    Route::patch('/{device_id}/status', [DeviceDataController::class, 'updateDeviceStatus']);
 });
 
 Route::middleware(['web'])->group(function () {

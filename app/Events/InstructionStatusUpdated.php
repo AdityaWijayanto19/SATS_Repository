@@ -42,7 +42,7 @@ class InstructionStatusUpdated implements ShouldBroadcastNow
                 'is_completed' => (bool) $this->instruction->is_completed,
                 'respon_nakes' => $this->instruction->respon_nakes,
                 'completed_by' => $this->instruction->nakes?->name ?? '—',
-                'completed_at' => $this->instruction->completed_at?->format('H:i'),
+                'completed_at' => $this->instruction->completed_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 'updated_at'   => $this->instruction->updated_at->toIso8601String(),
             ],
         ];

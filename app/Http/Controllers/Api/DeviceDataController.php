@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSystemStatusRequest;
 use App\Http\Requests\RegisterDeviceRequest;
 use App\Jobs\ProcessDeviceData;
+use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\Devices;
 use App\Services\DeviceService;
+use App\Services\MonitoringSessionService;
+use App\Events\DeviceStatusChanged;
+use App\Events\DeviceStatusChangedGlobal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -17,10 +21,12 @@ use Illuminate\Support\Str;
 class DeviceDataController extends Controller
 {
     protected DeviceService $deviceService;
+    protected MonitoringSessionService $sessionService;
 
-    public function __construct(DeviceService $deviceService)
+    public function __construct(DeviceService $deviceService, MonitoringSessionService $sessionService)
     {
         $this->deviceService = $deviceService;
+        $this->sessionService = $sessionService;
     }
 
     /**
@@ -263,5 +269,82 @@ class DeviceDataController extends Controller
                 'status' => $device->status,
             ],
         ], 200);
+    }
+
+    /**
+     * Update device status (online/offline) from IoT device GUI
+     * Endpoint: PATCH /api/device/{device_id}/status
+     * Auth: API Key
+     */
+    public function updateDeviceStatus(string $deviceId): JsonResponse
+    {
+        $status = request('status');
+
+        if (!in_array($status, ['online', 'offline'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status must be online or offline',
+            ], 422);
+        }
+
+        $device = Devices::where('device_id', $deviceId)->first();
+
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device not found',
+            ], 404);
+        }
+
+        $device->update([
+            'status' => $status,
+            'last_seen' => $status === 'online' ? now() : $device->last_seen,
+        ]);
+
+        // Auto-create monitoring session when device goes online
+        if ($status === 'online') {
+            // Find nakes user associated with this device
+            $nakesConfig = \App\Models\NakesDeviceConfig::where('device_id', $deviceId)->first();
+            $userId = $nakesConfig?->user_id ?? 1; // fallback to user 1 if no nakes configured
+
+            // Check if there's already an active session
+            $activeSession = $this->sessionService->getActiveSession($deviceId);
+            if (!$activeSession) {
+                $session = $this->sessionService->createSession($deviceId, $userId);
+                Log::info("Auto-created monitoring session {$session->medical_record_number} for device {$deviceId}");
+            }
+        }
+
+        // Finalize active session when device goes offline
+        if ($status === 'offline') {
+            $activeSession = $this->sessionService->getActiveSession($deviceId);
+            if ($activeSession) {
+                $this->sessionService->finalizeSession($activeSession->id);
+                Log::info("Finalized monitoring session {$activeSession->medical_record_number} for device {$deviceId}");
+            }
+        }
+
+        broadcast(new DeviceStatusChanged($deviceId, $status));
+        broadcast(new DeviceStatusChangedGlobal($deviceId, $status));
+
+        $logType = $status === 'online' ? 'device.online' : 'device.offline';
+        $logMsg = $status === 'online'
+            ? "Perangkat {$deviceId} diaktifkan dari device"
+            : "Perangkat {$deviceId} dinonaktifkan dari device";
+        ActivityLog::log($logType, $logMsg, 'Device', 'device', $deviceId);
+
+        Log::channel('device-audit')->info('Device status updated from device', [
+            'device_id' => $deviceId,
+            'status' => $status,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Device status updated to {$status}",
+            'data' => [
+                'device_id' => $deviceId,
+                'status' => $status,
+            ],
+        ]);
     }
 }

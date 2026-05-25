@@ -9,33 +9,50 @@ Database `sats_db` digunakan oleh sistem SATS (Smart Ambulance Telemedicine Syst
 ## Entity Relationship Diagram (ERD)
 
 ```
-+-------------+       +----------------+       +------------------+
-|   users     |       |   patients     |       |    devices       |
-|-------------|       |----------------|       |------------------|
-| id (PK)     |<------+ nakes (FK)     |       | device_id (PK)   |
-| name        |       | id (PK)        |       | status           |
-| email       |       | device_id (FK) +------>| ml_prediction    |
-| password    |       | nama           |       | ml_condition     |
-| role        |       | jenis_kelamin  |       | ml_risk_level    |
-+-------------+       | umur           |       | ml_probabilities |
-                      | catatan_tambahan|       | ml_predicted_at  |
-                      +----------------+       | last_seen        |
-                                               +------------------+
-                              |                        |
-                              v                        v
-                      +------------------+    +-------------------+
-                      | medical_records  |    |   sensor_datas    |
-                      |------------------|    |-------------------|
-                      | id (PK)          |    | id (PK)           |
-                      | patient_id (FK)  |    | device_id (FK)    |
-                      | device_id (FK)   |    | heart_rate        |
-                      | heart_rate       |    | spo2              |
-                      | spo2             |    | temperature       |
-                      | temperature      |    | status            |
-                      | status           |    | prediction        |
-                      | prediction       |    | created_at        |
-                      | created_at       |    +-------------------+
-                      +------------------+
++-------------+       +------------------+       +------------------+
+|   users     |       |    patients      |       |    devices       |
+|-------------|       |------------------|       |------------------|
+| id (PK)     |<------+ nakes_id (FK)    |       | device_id (PK)   |
+| name        |       | id (PK)          |       | status           |
+| email       |       | device_id (FK)   |       | ml_prediction    |
+| password    |       | no_rekam_medis   |       | ml_condition     |
+| role        |       | nama             |       | ml_risk_level    |
++-------------+       | nik              |       | ml_probabilities |
+      |               | tanggal_lahir    |       | ml_predicted_at  |
+      |               | jenis_kelamin    |       | last_seen        |
+      |               | umur             |       +------------------+
+      |               | penyakit_alergi  |               |
+      |               | catatan_tambahan |               |
+      |               +------------------+               |
+      |                       |                          |
+      |                       v                          v
+      |               +---------------------+    +-------------------+
+      |               | monitoring_sessions |    |   sensor_datas    |
+      |               |---------------------|    | (temporary/realtime)
+      +-------------->| id (PK)             |    |-------------------|
+        created_by    | device_id (FK)      |    | id (PK)           |
+                      | patient_id (FK)     |    | device_id (FK)    |
+                      | medical_record_number|   | heart_rate        |
+                      | created_by (FK)     |    | spo2              |
+                      | started_at          |    | temperature       |
+                      | ended_at            |    | status            |
+                      | status              |    | created_at        |
+                      | total_readings      |    +-------------------+
+                      +---------------------+
+                              |
+                              v
+                      +---------------------+
+                      |   sensor_readings   |
+                      | (finalized/laporan) |
+                      |---------------------|
+                      | id (PK)             |
+                      | session_id (FK)     |
+                      | heart_rate          |
+                      | spo2                |
+                      | temperature         |
+                      | status              |
+                      | recorded_at         |
+                      +---------------------+
 
 +----------------+       +--------------------+       +----------------+
 | activity_log   |       |   instructions     |       | system_statuses|
@@ -52,17 +69,26 @@ Database `sats_db` digunakan oleh sistem SATS (Smart Ambulance Telemedicine Syst
                          | completed_by (FK)  |
                          +--------------------+
 
-+----------------+
-|   api_keys     |
-|----------------|
-| id (PK)        |
-| device_id (FK) |
-| key            |
-| name           |
-| is_active      |
++----------------+       +---------------------+
+|   api_keys     |       | nakes_device_configs |
+|----------------|       |---------------------|
+| id (PK)        |       | id (PK)             |
+| device_id (FK) |       | user_id (FK)        |
+| key            |       | device_id (FK)      |
+| name           |       | created_at          |
+| is_active      |       +---------------------+
 | created_at     |
 | updated_at     |
 +----------------+
+
++---------------------+
+| device_monitorings  |
+|---------------------|
+| id (PK)             |
+| dokter_id (FK)      |
+| device_id (FK)      |
+| created_at          |
++---------------------+
 ```
 
 ---
@@ -102,17 +128,21 @@ Menyimpan data perangkat SATS Wearable yang terdaftar.
 
 ### 3. `patients`
 
-Menyimpan data pasien yang terhubung dengan perangkat.
+Menyimpan data pasien yang terhubung dengan monitoring session.
 
 | Kolom            | Tipe    | Constraint  | Keterangan                              |
 |------------------|---------|-------------|-----------------------------------------|
-| patient_id       | int     | PK, auto-increm | ID unik pasien                     |
-| device_id        | varchar | FK → devices | Perangkat yang terpasang pada pasien    |
+| id               | int     | PK, auto-increm | ID unik pasien                     |
+| device_id        | varchar | FK → devices | Perangkat yang digunakan               |
+| nakes_id         | int     | FK → users  | Nakes yang menginput data               |
+| no_rekam_medis   | varchar | UNIQUE      | Auto-generate: RM-{DEVICE}-{DATE}-{SEQ} |
 | nama             | varchar | NOT NULL    | Nama lengkap pasien                     |
-| jenis_kelamin    | varchar | NOT NULL    | Jenis kelamin pasien                    |
+| nik              | varchar | NULL        | Nomor Induk Kependudukan                |
+| tanggal_lahir    | date    | NULL        | Tanggal lahir pasien                    |
+| jenis_kelamin    | enum    | NOT NULL    | `L` (Laki-laki), `P` (Perempuan)       |
 | umur             | int     | NOT NULL    | Umur pasien                             |
-| catatan_tambahan | text    | NULL        | Riwayat penyakit / alergi / catatan     |
-| nakes            | int     | FK → users  | Nakes/dokter yang menangani             |
+| penyakit_alergi  | varchar | NULL        | Riwayat penyakit / alergi               |
+| catatan_tambahan | text    | NULL        | Catatan tambahan                        |
 
 ---
 
@@ -133,7 +163,68 @@ Menyimpan data real-time dari sensor perangkat IoT (vital sign pasien).
 
 ---
 
-### 5. `medical_records`
+### 5. `monitoring_sessions`
+
+Menyimpan metadata sesi monitoring per device ON/OFF. Setiap kali device diaktifkan, session baru dibuat.
+
+| Kolom               | Tipe    | Constraint       | Keterangan                              |
+|---------------------|---------|------------------|-----------------------------------------|
+| id                  | int     | PK, auto-increm  | ID unik session                         |
+| device_id           | varchar | FK → devices     | Perangkat yang dipakai                  |
+| patient_id          | int     | FK → patients, NULL | Data pasien (bisa diisi nanti)       |
+| medical_record_number | varchar | UNIQUE, NOT NULL | Auto: RM-{DEVICE}-{DATE}-{SEQ}        |
+| created_by          | int     | FK → users       | Nakes yang mengaktifkan device          |
+| started_at          | timestamp | NOT NULL       | Waktu device ON                         |
+| ended_at            | timestamp | NULL           | Waktu device OFF + finalize             |
+| status              | enum    | default 'active' | `active`, `pending`, `completed`, `cancelled` |
+| total_readings      | int     | default 0        | Jumlah data sensor di sesi ini          |
+| notes               | text    | NULL             | Catatan nakes                           |
+
+---
+
+### 6. `sensor_readings`
+
+Menyimpan data vital sign yang sudah di-finalize dari `sensor_data`. Data di sini dipakai untuk laporan PDF.
+
+| Kolom       | Tipe      | Constraint       | Keterangan                              |
+|-------------|-----------|------------------|-----------------------------------------|
+| id          | int       | PK, auto-increm  | ID unik reading                         |
+| session_id  | int       | FK → monitoring_sessions | Session terkait                  |
+| heart_rate  | int       | NULL             | Detak jantung (bpm)                     |
+| spo2        | int       | NULL             | Saturasi oksigen (%)                    |
+| temperature | float     | NULL             | Suhu tubuh (Celsius)                    |
+| status      | enum      | NULL             | `normal`, `warning`, `critical`         |
+| recorded_at | timestamp | NOT NULL         | Waktu asli dari sensor_data             |
+
+---
+
+### 7. `nakes_device_configs`
+
+Menyimpan konfigurasi device yang dipilih nakes. Satu nakes terhubung ke satu device.
+
+| Kolom      | Tipe    | Constraint       | Keterangan                       |
+|------------|---------|------------------|----------------------------------|
+| id         | int     | PK, auto-increm  | ID unik config                   |
+| user_id    | int     | FK → users       | Nakes terkait                    |
+| device_id  | varchar | FK → devices     | Device yang dipilih              |
+| created_at | timestamp | auto           | Waktu config dibuat              |
+
+---
+
+### 8. `device_monitorings`
+
+Menyimpan hubungan dokter dengan device yang dipantau. Dokter bisa pantau banyak device.
+
+| Kolom      | Tipe    | Constraint       | Keterangan                       |
+|------------|---------|------------------|----------------------------------|
+| id         | int     | PK, auto-increm  | ID unik                          |
+| dokter_id  | int     | FK → users       | Dokter terkait                   |
+| device_id  | varchar | FK → devices     | Device yang dipantau             |
+| created_at | timestamp | auto           | Waktu dibuat                     |
+
+---
+
+### 9. `medical_records`
 
 Menyimpan rekam medis pasien yang sudah diinput oleh nakes setelah pasien tiba di rumah sakit.
 
@@ -151,7 +242,7 @@ Menyimpan rekam medis pasien yang sudah diinput oleh nakes setelah pasien tiba d
 
 ---
 
-### 6. `activity_log`
+### 10. `activity_log`
 
 Menyimpan log aktivitas sistem untuk audit trail.
 
@@ -163,7 +254,7 @@ Menyimpan log aktivitas sistem untuk audit trail.
 
 ---
 
-### 7. `system_statuses`
+### 11. `system_statuses`
 
 Menyimpan status monitoring perangkat (battery, signal).
 
@@ -176,7 +267,7 @@ Menyimpan status monitoring perangkat (battery, signal).
 
 ---
 
-### 8. `instructions`
+### 12. `instructions`
 
 Menyimpan instruksi dokter ke nakes dan laporan nakes ke dokter.
 
@@ -197,7 +288,7 @@ Menyimpan instruksi dokter ke nakes dan laporan nakes ke dokter.
 
 ---
 
-### 9. `api_keys`
+### 13. `api_keys`
 
 Menyimpan API key untuk autentikasi integrasi IoT.
 
@@ -217,10 +308,16 @@ Menyimpan API key untuk autentikasi integrasi IoT.
 | Tabel Asal      | Kolom FK       | Tabel Tujuan | Tipe Relasi  | Keterangan                              |
 |-----------------|----------------|--------------|--------------|-----------------------------------------|
 | `patients`      | `device_id`    | `devices`    | Many-to-One  | Satu pasien terhubung ke satu perangkat |
-| `patients`      | `nakes`        | `users`      | Many-to-One  | Satu nakes menangani banyak pasien      |
+| `patients`      | `nakes_id`     | `users`      | Many-to-One  | Satu nakes menangani banyak pasien      |
+| `monitoring_sessions` | `device_id` | `devices`   | Many-to-One  | Satu device punya banyak session        |
+| `monitoring_sessions` | `patient_id` | `patients`  | Many-to-One  | Satu pasien bisa punya banyak session   |
+| `monitoring_sessions` | `created_by` | `users`     | Many-to-One  | Nakes yang membuat session              |
+| `sensor_readings` | `session_id` | `monitoring_sessions` | Many-to-One | Satu session punya banyak readings |
 | `sensor_datas`  | `device_id`    | `devices`    | Many-to-One  | Satu perangkat mengirim banyak data     |
-| `medical_records`| `patient_id`  | `patients`   | Many-to-One  | Satu pasien punya banyak rekam medis    |
-| `medical_records`| `device_id`   | `devices`    | Many-to-One  | Rekam medis terkait perangkat           |
+| `nakes_device_configs` | `user_id` | `users`     | Many-to-One  | Satu nakes punya satu config            |
+| `nakes_device_configs` | `device_id` | `devices`   | Many-to-One  | Satu device dipakai banyak nakes        |
+| `device_monitorings` | `dokter_id` | `users`     | Many-to-One  | Satu dokter pantau banyak device        |
+| `device_monitorings` | `device_id` | `devices`   | Many-to-One  | Satu device dipantau banyak dokter      |
 | `instructions`  | `device_id`    | `devices`    | Many-to-One  | Banyak instruksi ke satu perangkat      |
 | `instructions`  | `dokter_id`    | `users`      | Many-to-One  | Satu dokter punya banyak instruksi      |
 | `instructions`  | `nakes_id`     | `users`      | Many-to-One  | Satu nakes menangani banyak instruksi   |
@@ -236,32 +333,40 @@ Nakes memasang perangkat pada pasien
         |
         v
 Perangkat dinyalakan (via perangkat / dashboard monitoring)
+        |--- Server auto-create monitoring_sessions (status: active)
+        |--- Auto-generate nomor rekam medis: RM-{DEVICE}-{DATE}-{SEQ}
         |
         v
 Perangkat mulai mengambil data sensor & mengirim ke database
-        |--- data masuk ke tabel sensor_data
-        |--- data ditampilkan real-time di dashboard
+        |--- data masuk ke tabel sensor_data (temporary, realtime)
+        |--- data ditampilkan real-time di dashboard (WebSocket)
+        |
+        v
+Nakes input data pasien (opsional, bisa kapan saja)
+        |--- via halaman /nakes/input-data-pasien
+        |--- via modal popup di halaman laporan
+        |--- data tersimpan di tabel patients, di-link ke session
         |
         v
 Nakes di RS tujuan memantau kondisi pasien via dashboard
         |
         v
 Pasien tiba di RS tujuan --> Nakes mematikan perangkat
-        |--- perintah "stop" masuk ke tabel commands
+        |--- Server finalize session:
+        |    1. COPY sensor_data → sensor_readings (dengan session_id)
+        |    2. DELETE semua sensor_data milik device
+        |    3. Update session → status: completed
         |
         v
-Nakes di ambulans menginput data pasien
-        |--- data masuk ke tabel patients
+Nakes melihat laporan di /nakes/laporan
+        |--- Pilih sesi dari dropdown (AJAX, tanpa refresh)
+        |--- Lihat identitas pasien, grafik, statistik, tabel riwayat
+        |--- Download PDF: Laporan_{nomor_rekam_medis}_{tanggal}.pdf
         |
         v
-Nakes melakukan cross-check di menu laporan
-        |--- pilih rentang tanggal/jam atau data vital terbaru
-        |
-        v
-Rekam medis ter-generate otomatis
-        |--- no rekam medis muncul di laporan
-        |--- data tersimpan di tabel medical_records
-        |--- laporan siap diunduh sebagai PDF
+Dokter melihat laporan di /dokter/laporan (read-only)
+        |--- Pilih device → pilih sesi
+        |--- Data sama dengan nakes, tapi tidak bisa edit pasien
 ```
 
 ---
@@ -301,4 +406,4 @@ Tabel berikut sudah ada dari migration default Laravel:
 
 ---
 
-*Last updated: 18 Mei 2026*
+*Last updated: 24 Mei 2026*

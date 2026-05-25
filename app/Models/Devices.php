@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Devices extends Model
 {
@@ -14,6 +15,7 @@ class Devices extends Model
     protected $fillable = [
         'device_id',
         'status',
+        'monitored_by',
         'last_seen',
         'ml_prediction',
         'ml_condition',
@@ -49,5 +51,27 @@ class Devices extends Model
     public function medicalRecords()
     {
         return $this->hasMany(MedicalRecord::class, 'device_id', 'device_id');
+    }
+
+    public function monitoredBy()
+    {
+        return $this->belongsTo(User::class, 'monitored_by');
+    }
+
+    public function monitoredByDokters()
+    {
+        return $this->belongsToMany(User::class, 'device_monitorings', 'device_id', 'dokter_id');
+    }
+
+    public function monitoringSessions()
+    {
+        return $this->hasMany(MonitoringSession::class, 'device_id', 'device_id');
+    }
+
+    public function activeSession()
+    {
+        return $this->hasOne(MonitoringSession::class, 'device_id', 'device_id')
+            ->where('status', 'active')
+            ->latest('started_at');
     }
 }

@@ -33,6 +33,10 @@
             class="px-3.5 py-2 text-sm font-semibold text-white/80 hover:text-white rounded-lg transition-colors">
             Cara Kerja
         </a>
+        <a href="#faq"
+            class="px-3.5 py-2 text-sm font-semibold text-white/80 hover:text-white rounded-lg transition-colors">
+            FAQ
+        </a>
 
         {{-- KONDISI USER SUDAH LOGIN --}}
         @auth

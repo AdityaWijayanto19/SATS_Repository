@@ -9,17 +9,24 @@
 ## Alur Sistem (End-to-End)
 
 ```
-[Perangkat IoT] --> [Sensor: Detak Jantung, SpO2, Suhu] --> [Pengiriman Data (MQTT/HTTP)]
+[Nakes Aktifkan Perangkat] --> [Monitoring Session Dibuat (auto-generate RM)]
         |
         v
-[Rule-Based Klasifikasi Kondisi] (di kode Arduino/IoT)
+[Perangkat IoT] --> [Sensor: HR, SpO2, Suhu] --> [HTTP POST ke API]
         |
         v
-[Web Dashboard Laravel] --> [Monitoring Real-Time]
-        |                    --> [Grafik Vital Sign]
-        |                    --> [Prediksi ML (rencana)]
+[Server: sensor_data (temporary)] --> [WebSocket Broadcast]
+        |                              --> [Dashboard Real-Time]
+        |                              --> [Prediksi ML (setiap 5 data)]
         v
-[Laporan Medis + PDF]
+[Nakes Matikan Perangkat] --> [Session Finalized]
+        |                     --> [sensor_data → sensor_readings]
+        |                     --> [sensor_data dihapus]
+        v
+[Nakes Input Data Pasien] --> [Link ke Session]
+        |
+        v
+[Laporan (AJAX)] --> [Pilih Sesi + Vital Sign] --> [Download PDF]
 ```
 
 ---
@@ -73,16 +80,19 @@
 
 ### 2. Dashboard Nakes [TERHUBUNG KE API]
 
-- Dropdown perangkat (polling `/api/devices` setiap 10 detik, auto-update tanpa refresh)
+- Dropdown perangkat (auto-update tanpa refresh)
 - 4 kartu statistik: Heart Rate, SpO2, Suhu, Kondisi Pasien
 - Banner prediksi ML (dari database, fallback "Data prediksi belum tersedia")
 - Probability card: Membaik/Stabil/Memburuk % dengan progress bar
-- 3 grafik real-time Chart.js (polling setiap 5 detik, skip update jika data sama)
+- **Chart toggle: mode "Terspisah" (3 chart terpisah) dan "Gabungan" (1 chart, 3 Y-axis)**
+- Grafik real-time Chart.js via WebSocket (zero polling)
 - **Terhubung ke API real (sensor-data/latest, sensor-data/history, instruction)**
 
 ### 3. Dashboard Dokter [TERHUBUNG KE API]
 
 - Identik dengan dashboard nakes (monitoring, chart, vital sign)
+- Dropdown pilih perangkat (subscribe semua device channels)
+- **Chart toggle: mode "Terspisah" (3 chart terpisah) dan "Gabungan" (1 chart, 3 Y-axis)**
 - **Terhubung ke API real (instruction, sensor-data)**
 
 ### 3b. Floating Chat Widget [TERHUBUNG KE API]
@@ -92,6 +102,8 @@
 - **Expanded:** Panel chat dengan header (logo SATS, status online, sapaan role), area pesan, input, footer
 - **Nakes:** Kirim pesan/laporan (free text) + 9 quick reply buttons (Sudah dilakukan, Dalam proses, Alat tidak tersedia, Obat sudah diberikan, Pasien stabil, Pasien kritis, Butuh bantuan, Gagal, Monitoring lanjutan)
 - **Dokter:** Kirim instruksi medis (free text), pantau laporan & respon nakes
+- **Chat alignment:** Pesan sendiri di kanan, pesan lawan di kiri (role-aware)
+- **Avatar:** Foto profil user dari `users.photo`, fallback ke inisial role (DR/NK)
 - Real-time via Laravel Reverb WebSocket (zero delay)
 - Echo channel cleanup saat ganti device
 - **Component:** `resources/views/components/chat-widget.blade.php` (Alpine.js `chatWidget()`)
@@ -99,29 +111,37 @@
 - **Tabel:** `instructions` (device_id, dokter_id, nakes_id, instruksi_dokter, respon_nakes, laporan_nakes, is_completed)
 - **Bug fixes:** Duplikasi pesan (Reverb + API response), `toOthers()` removed, nested `template x-if` → `x-show`, device subscription untuk offline devices
 
-### 4. Input Data Pasien [UI SELESAI, BELUM ADA BACKEND]
+### 4. Input Data Pasien [TERHUBUNG KE BACKEND]
 
-- Form: No. Rekam Medis, Nama, NIK, Tgl Lahir, Jenis Kelamin, Penyakit/Alergi, Catatan
-- Tersedia di nakes, dokter, dan superadmin
-- **Belum ada POST handler di backend**
+- Form: Nama, NIK, Tgl Lahir, Umur, Jenis Kelamin, Penyakit/Alergi, Catatan
+- Nomor rekam medis auto-generate: `RM-{DEVICE_ID}-{YYYYMMDD}-{SEQ}`
+- **Backend: `PatientController::store()` + `MonitoringSessionService::linkPatient()`**
+- Tersedia di halaman input-data-pasien dan modal popup di halaman laporan
+- Data pasien di-link ke active monitoring session
 
-### 5. Laporan Medis Nakes & Dokter [UI SELESAI, DATA DUMMY]
+### 5. Laporan Medis Nakes & Dokter [TERHUBUNG KE DATABASE]
 
-- Identitas pasien, banner prediksi ML
-- Grafik tekanan darah (sistolik/diastolik)
-- Nilai vital (heart rate, SpO2)
-- Hasil klasifikasi ML (Normal/Warning/Critical)
-- Tabel riwayat kondisi pasien
-- Filter rentang tanggal
-- Download PDF (via DomPDF + QuickChart.io)
-- `LaporanController` sudah role-aware (cek `auth()->user()->role`)
+- Identitas pasien dari `patients` table (via monitoring session)
+- Banner prediksi ML
+- Grafik vital signs (Chart.js) — re-init setelah AJAX load
+- Nilai vital (heart rate, SpO2, temperature) + statistik (avg, min, max)
+- **AJAX session selection** — dropdown sesi, load data tanpa refresh halaman
+- **Vital sign checkbox** — pilih vital sign yang ditampilkan
+- **Partial views** — `_laporan-patient`, `_laporan-content`, `_laporan-sidebar`
+- **Input Data Pasien modal** — popup dengan background blur putih
+- Tabel riwayat sensor readings
+- Download PDF dengan data real (DomPDF + QuickChart.io, nama file = nomor rekam medis)
+- `LaporanController` + `ReportService` — real data dari `monitoring_sessions` + `sensor_readings`
+- Dokter: read-only (tidak bisa edit data pasien)
 
-### 6. Dashboard Superadmin [UI SELESAI, DATA DUMMY]
+### 6. Dashboard Superadmin [TERHUBUNG KE BACKEND]
 
-- 4 kartu statistik: Total Alat, Alat Aktif, Alat Non-Aktif, Total Pengguna
-- Tabel Alat Kritis (5 perangkat dengan status Warning/Kritis)
-- Log Aktivitas Terbaru (timeline dengan indikator warna)
-- **Belum terhubung ke database real**
+- 5 kartu statistik: Total Alat, Alat Aktif, Alat Non-Aktif, Total Pengguna, Pengguna Online
+- Tabel Perangkat Aktif (device_id, kondisi pasien, nakes, dokter, waktu update)
+- Log Aktivitas Terbaru (16 event types, timeline dengan indikator warna)
+- Real-time updates via WebSocket (Alpine.js + Laravel Echo)
+- **Backend: DashboardController + ActivityLog model**
+- **FIXED:** WebSocket real-time untuk activity log — menggunakan PrivateChannel + Alpine double-init workaround
 
 ### 7. Manajemen Alat (Superadmin) [TERHUBUNG KE BACKEND]
 
@@ -132,13 +152,14 @@
 - Auto-generate API key saat registrasi device (ditampilkan sekali)
 - **Backend: ManajemenAlatController (store, show, destroy)**
 
-### 8. Manajemen User (Superadmin) [UI SELESAI, BELUM ADA ROUTE]
+### 8. Manajemen User (Superadmin) [TERHUBUNG KE BACKEND]
 
 - Tabel pengguna (data dari database)
 - Badge peran berwarna: Super Admin (ungu), Dokter (biru), Perawat (pink)
 - Modal "+ Tambah User" (ID, Nama, Peran dropdown, Email)
 - Modal Detail user (avatar, role badge, telepon, tgl bergabung)
-- **Backend: UserController sudah ada (store, update, destroy), belum ada route di web.php**
+- **Backend: UserController (store, update, destroy) + routes terdaftar di web.php**
+- **Routes:** POST `/superadmin/manajemen-user`, DELETE `/superadmin/manajemen-user/{user}`
 
 ### 9. Laporan Superadmin [UI SELESAI, DATA DUMMY]
 
@@ -157,32 +178,60 @@
   - **Dokter:** Dashboard, Input Data Pasien, Laporan, Instruksi
   - **Nakes:** Dashboard, Input Data Pasien, Laporan, Instruksi
 - Active state menggunakan `request()->routeIs()`
-- Navbar: logo + nama user + role + tombol logout
+- **Sidebar logo clickable** → landing page (`/`)
+- Navbar: logo + nama user + role + profile dropdown (edit profile, logout)
+
+### 10b. Edit Profil [SELESAI]
+
+- Form edit: nama, email, password (opsional), foto profil
+- **Default avatar per role:** 4 variasi per role (superadmin, dokter, nakes) di `public/assets/photo_profile/`
+- Radio selection untuk pilih avatar, preview real-time
+- **Backend:** `ProfileController` (edit, update)
+- **Migration:** `photo` column di tabel `users`
+- **Routes:** `GET /profile/edit`, `PUT /profile` (semua role)
+
+### 10c. Landing Page [SELESAI]
+
+- Halaman publik (`/`) dengan 7 section:
+  1. **Hero** — judul utama + CTA
+  2. **Tentang** — penjelasan SATS
+  3. **Fitur** — 3 fitur utama (Real-Time Monitoring, Urgency Classification, Predictive Analytics)
+  4. **Alat** — perangkat IoT yang digunakan
+  5. **Cara Kerja** — alur sistem
+  6. **FAQ** — 6 pertanyaan umum (accordion Alpine.js)
+  7. **Closing** — CTA penutup
+- Navbar: navigasi section + login/dashboard link (conditional auth)
+- Footer dengan informasi project
+- **Layout:** `layouts/landing.blade.php`
+- **Sections:** `pages/landing/sections/` (7 file)
 
 ### 11. Backend & Database [SEBAGIAN BESAR SELESAI]
 
 **Sudah ada:**
-- 11 migrasi (users, devices, sensor_datas, system_statuses, api_keys, patients, medical_records, activity_log, instructions, cache, jobs)
-- 9 model Eloquent dengan relasi: User, Devices, SensorData, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction
-- 5 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService
+- 15 migrasi (users, devices, sensor_datas, sensor_readings, system_statuses, api_keys, patients, medical_records, activity_log, instructions, monitoring_sessions, nakes_device_configs, device_monitorings, cache, jobs, add_photo_to_users)
+- 13 model Eloquent: User, Devices, SensorData, SensorReading, SystemStatus, ApiKey, Patient, MedicalRecord, ActivityLog, Instruction, MonitoringSession, NakesDeviceConfig, DeviceMonitoring
+- 8 service layer: AuthService, DeviceService, UserService, InstructionService, SensorService, PatientMonitoringService, MonitoringSessionService, ReportService
+- `ProfileController` untuk edit profil user
+- `PatientController` untuk input data pasien + link ke session
 - 11 form request validation
-- 3 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted
+- 4 event class: InstructionSent, InstructionStatusUpdated, InstructionReportSubmitted, ActivityLogCreated
+- 16 activity log events: user login/logout, password reset, device online/offline/added/deleted, monitoring started/stopped, patient warning/critical, instruction sent/completed, user added/deleted
 - 2 job class: ProcessDeviceData, ProcessSensorData
 - API sensor data (POST, GET latest, GET history)
 - API instruksi (GET, POST, POST report, PATCH update, PATCH complete)
-- API device list (`/api/devices`)
+- API device list (`/api/devices` — termasuk active_session)
 - API system status (POST, GET)
+- API laporan AJAX (`GET /nakes/laporan/session-data`)
+- API input data pasien (`POST /nakes/input-data-pasien`)
 - Autentikasi device via API key
 - Queue & broadcasting infrastructure (Redis + Reverb)
 - Seeder: 3 user + 2 device + 2 API key
+- Monitoring session system (auto-create ON, finalize OFF, auto-generate RM)
 - Dokumentasi: [DATABASE.md](DATABASE.md), [BACKEND.md](BACKEND.md)
 
 **Belum ada:**
-- Backend input data pasien (POST handler)
-- Route untuk UserController (CRUD user belum terhubung ke UI)
-- Laporan dari database (masih dummy data)
+- Laporan superadmin dari database (masih dummy data)
 - Device config dari database (masih hardcoded)
-- Activity log controller
 
 ### 12. Integrasi IoT [SIMULATOR SUDAH ADA]
 
@@ -230,6 +279,7 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 ## Rencana Perbaikan & Pengembangan
 
 ### Prioritas 1 — Realtime & Delay Fix
+- [x] **FIX: WebSocket broadcasting auth 403 error** — Fixed: PrivateChannel + Alpine double-init workaround
 - [ ] Kurangi delay pengiriman data simulator → dashboard
 - [ ] Optimasi polling: pertimbangkan SSE (Server-Sent Events) sebagai alternatif
 - [ ] Kurangi atau hapus cache TTL pada DeviceService (saat ini 5 menit)
@@ -242,12 +292,14 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 - [ ] Notifikasi realtime (broadcasting via Reverb sudah ada, perlu listener di frontend)
 
 ### Prioritas 3 — Backend yang Belum Selesai
-- [ ] Backend input data pasien (POST route + controller → tabel `patients`)
-- [ ] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
-- [ ] Aktifkan query database di LaporanController (ganti dummy data)
+- [x] Backend input data pasien (POST route + controller → tabel `patients`)
+- [x] Daftarkan route untuk UserController (CRUD user ke manajemen-user)
+- [x] Aktifkan query database di LaporanController (ganti dummy data) → real data via ReportService
 - [ ] Aktifkan query database di SuperadminLaporanController (ganti dummy data)
 - [ ] Device config dari database (ganti hardcoded)
-- [ ] Activity log: tulis log di setiap aksi penting
+- [x] Activity log: 16 event types sudah terinstrumentasi
+- [x] Monitoring session system (auto-create ON, finalize OFF, auto-generate RM)
+- [ ] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun (guest), inbox superadmin (plan: `docs/plan-hubungi-superadmin.md`)
 
 ### Prioritas 4 — Integrasi & Testing
 - [ ] Testing dengan hardware IoT real
@@ -272,10 +324,12 @@ app/Http/Controllers/
   DashboardController.php         # Role-based view resolver + API device list
   UserController.php              # CRUD user (superadmin)
   ManajemenAlatController.php     # CRUD perangkat IoT (superadmin)
-  LaporanController.php           # Laporan HTML + PDF nakes/dokter (role-aware)
+  LaporanController.php           # Laporan HTML + PDF nakes/dokter (real data + AJAX)
   SuperadminLaporanController.php # Laporan HTML + PDF superadmin
+  PatientController.php           # Input data pasien + link ke monitoring session
+  ProfileController.php           # Edit profil user (nama, email, password, foto)
   Api/
-    DeviceDataController.php      # Autentikasi device, system status, device config
+    DeviceDataController.php      # Autentikasi device, system status, session lifecycle
     SensorDataController.php      # Sensor data endpoint (store, latest, history)
     InstructionController.php     # Instruksi dokter-nakes (CRUD + report + complete)
 
@@ -284,12 +338,15 @@ app/Services/
   DeviceService.php               # Sensor data CRUD + caching
   UserService.php                 # User CRUD
   InstructionService.php          # Instruksi dokter-nakes business logic
-  SensorService.php               # Sensor data operations + caching
+  SensorService.php               # Sensor data operations + caching + trigger ML
+  MonitoringSessionService.php    # Session lifecycle: create, finalize, link patient
+  ReportService.php               # Report data: getReportData, getChart, getStats
 
 app/Events/
   InstructionSent.php             # Broadcast saat dokter kirim instruksi
   InstructionStatusUpdated.php    # Broadcast saat nakes selesaikan instruksi
   InstructionReportSubmitted.php  # Broadcast saat nakes submit laporan
+  ActivityLogCreated.php          # Broadcast activity log real-time ke superadmin dashboard
 
 app/Jobs/
   ProcessDeviceData.php           # Queue: proses system status device
@@ -301,14 +358,18 @@ app/Http/Middleware/
 
 app/Models/
   User.php                        # users
-  Devices.php                     # devices (PK: device_id string)
-  SensorData.php                  # sensor_datas
+  Devices.php                     # devices (PK: device_id string, ML fields)
+  SensorData.php                  # sensor_datas (temporary, realtime dashboard)
+  SensorReading.php               # sensor_readings (finalized, untuk laporan)
   SystemStatus.php                # system_statuses
   ApiKey.php                      # api_keys
   Patient.php                     # patients
   MedicalRecord.php               # medical_records
   ActivityLog.php                 # activity_log
   Instruction.php                 # instructions
+  MonitoringSession.php           # monitoring_sessions
+  NakesDeviceConfig.php           # nakes_device_configs
+  DeviceMonitoring.php            # device_monitorings
 
 database/seeders/
   UserSeeder.php                  # 3 akun: superadmin, dokter, nakes
@@ -323,24 +384,45 @@ simulasi_py/
 resources/views/
   components/
     navbar.blade.php              # Navigasi atas (nama + role + logout)
-    sidebar.blade.php             # Sidebar dinamis (nakes/dokter/superadmin)
+    sidebar.blade.php             # Sidebar dinamis (nakes/dokter/superadmin), logo → landing
+    chat-widget.blade.php         # Floating chat widget (nakes & dokter dashboard)
+    profile-dropdown.blade.php    # Dropdown profil (edit profile, logout)
+    landing-navbar.blade.php      # Navbar landing page
+    landing-footer.blade.php      # Footer landing page
   layouts/
     app.blade.php                 # Layout utama
     auth.blade.php                # Layout halaman auth
+    landing.blade.php             # Layout landing page
   pages/
+    landing.blade.php             # Landing page (7 sections)
     login.blade.php               # Login + image slider
     auth/                         # Forgot & reset password
+    profile/
+      edit.blade.php              # Edit profil (nama, email, password, avatar)
+    landing/
+      sections/
+        hero.blade.php            # Section hero
+        tentang.blade.php         # Section tentang
+        fitur.blade.php           # Section fitur
+        alat.blade.php            # Section alat
+        cara-kerja.blade.php      # Section cara kerja
+        faq.blade.php             # Section FAQ (accordion)
+        closing.blade.php         # Section CTA
     nakes/
-      dashboard.blade.php         # Monitoring vital sign (API-connected)
-      inputdata.blade.php         # Form input pasien
-      laporan.blade.php           # Laporan medis + chart
-      laporan-pdf.blade.php       # Template PDF
+      dashboard.blade.php         # Monitoring vital sign + chart toggle + session banner
+      inputdata.blade.php         # Form input pasien (terhubung ke backend)
+      laporan.blade.php           # Laporan medis + AJAX session + modal input pasien
+      laporan-pdf.blade.php       # Template PDF (real data)
       instruksi.blade.php         # Chat instruksi dokter + laporan nakes (API-connected)
+      partials/
+        _laporan-patient.blade.php   # Identitas pasien + tombol input data
+        _laporan-content.blade.php   # ML banner, chart, vital signs, stats, tabel
+        _laporan-sidebar.blade.php   # Info session + tombol download PDF
     dokter/
-      dashboard.blade.php         # Monitoring vital sign (API-connected)
+      dashboard.blade.php         # Monitoring vital sign + chart toggle (API-connected)
       inputdata.blade.php         # Form input pasien
-      laporan.blade.php           # Laporan medis + chart
-      laporan-pdf.blade.php       # Template PDF
+      laporan.blade.php           # Laporan medis + AJAX session (read-only)
+      laporan-pdf.blade.php       # Template PDF (real data)
       instruksi.blade.php         # Chat instruksi medis + pantau laporan nakes (API-connected)
     superadmin/
       dashboard.blade.php         # Stat cards, tabel kritis, log aktivitas
@@ -443,7 +525,7 @@ Data yang di-seed:
 
 #### 7. Jalankan Development Server
 
-Buka **4 terminal** secara bersamaan:
+Buka **5 terminal** secara bersamaan:
 
 **Terminal 1 — Vite (Tailwind CSS & hot reload):**
 ```bash
@@ -455,12 +537,17 @@ npm run dev
 php artisan serve
 ```
 
-**Terminal 3 — Queue worker (proses sensor data + ML prediction):**
+**Terminal 3 — Redis server (wajib untuk autentikasi API key device):**
+```bash
+redis_server/redis-server.exe redis_server/redis.windows.conf
+```
+
+**Terminal 4 — Queue worker (proses sensor data + ML prediction):**
 ```bash
 php artisan queue:work
 ```
 
-**Terminal 4 — Reverb WebSocket server (real-time updates):**
+**Terminal 5 — Reverb WebSocket server (real-time updates):**
 ```bash
 php artisan reverb:start
 ```
@@ -528,7 +615,9 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 | Simulator `Connection refused` | Pastikan Laravel server berjalan di `http://localhost:8000` |
 | Simulator `401 Unauthorized` | Cek API key di `config.py` cocok dengan yang di-seed di database |
 | Dashboard tidak update | Pastikan simulator berjalan + Reverb & queue worker running |
-| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terpisah |
+| `Pusher error: cURL error 7` | Jalankan `php artisan reverb:start` di terminal terparsah |
+| Activity log tidak real-time | Pastikan `php artisan reverb:start` berjalan. Sudah di-fix dengan PrivateChannel + Alpine double-init workaround. |
+| Simulator `Authentication error: Connection refused` | Redis server belum jalan. Jalankan `redis_server/redis-server.exe redis_server/redis.windows.conf` |
 | ML prediction tidak muncul | Pastikan `php artisan queue:work` berjalan, cek log untuk "ML trigger" |
 
 ---
@@ -550,33 +639,39 @@ python simulator.py --device DEVICE_02 --key test_key_device_02
 Nakes memasang perangkat pada pasien
         |
         v
-Perangkat dinyalakan (via perangkat / dashboard monitoring)
+Nakes mengaktifkan perangkat (toggle ON di dashboard)
+        |--- Monitoring session otomatis dibuat (status: active)
+        |--- Nomor rekam medis auto-generate: RM-{DEVICE}-{DATE}-{SEQ}
+        |--- Dashboard menampilkan banner session aktif
         |
         v
-Perangkat mulai mengambil data sensor & mengirim ke database
-        |--- data masuk ke tabel sensor_data
-        |--- data ditampilkan real-time di dashboard
+Perangkat mulai mengirim data sensor setiap 1-2 detik
+        |--- data masuk ke tabel sensor_data (temporary)
+        |--- data ditampilkan real-time di dashboard (WebSocket)
+        |--- prediksi ML trigger setiap 5 data baru
         |
         v
-Nakes di RS tujuan memantau kondisi pasien via dashboard
+Nakes input data pasien (opsional, bisa kapan saja)
+        |--- dari halaman input-data-pasien atau modal di laporan
+        |--- data pasien di-link ke active session
         |
         v
-Pasien tiba di RS tujuan --> Nakes mematikan perangkat
-        |--- perintah "stop" masuk ke tabel commands
+Pasien tiba di RS tujuan --> Nakes mematikan perangkat (toggle OFF)
+        |--- Session masuk status: completed
+        |--- sensor_data di-copy ke sensor_readings (finalized)
+        |--- SEMUA sensor_data untuk device dihapus
         |
         v
-Nakes di ambulans menginput data pasien
-        |--- data masuk ke tabel patients
+Nakes buka halaman laporan
+        |--- Pilih sesi dari dropdown (AJAX, tanpa refresh)
+        |--- Pilih vital sign yang ditampilkan (checkbox)
+        |--- Lihat identitas pasien, grafik, statistik, tabel riwayat
         |
         v
-Nakes melakukan cross-check di menu laporan
-        |--- pilih rentang tanggal/jam atau data vital terbaru
-        |
-        v
-Rekam medis ter-generate otomatis
-        |--- no rekam medis muncul di laporan
-        |--- data tersimpan di tabel medical_records
-        |--- laporan siap diunduh sebagai PDF
+Download PDF laporan
+        |--- Nama file: Laporan-{nomor_rekam_medis}-{tanggal}.pdf
+        |--- Data real dari sensor_readings + patients
+        |--- Grafik via QuickChart.io
 ```
 
 ---
@@ -589,7 +684,8 @@ Rekam medis ter-generate otomatis
 - [FRONTEND.md](FRONTEND.md) - Detail progress frontend, TODO list, dan rencana harian
 - [BACKEND.md](BACKEND.md) - Detail progress backend, API endpoints, service layer, dan simulator
 - [DATABASE.md](DATABASE.md) - Struktur database, ERD, relasi, dan alur data sistem
+- [LAPORAN_SYSTEM.md](LAPORAN_SYSTEM.md) - Desain sistem laporan, monitoring session, dan filterisasi data
 
 ---
 
-*Last updated: 18 Mei 2026*
+*Last updated: 24 Mei 2026 (monitoring session, laporan real data, AJAX, input pasien)*

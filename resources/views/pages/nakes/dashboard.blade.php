@@ -17,19 +17,17 @@
             </div>
 
             <div class="flex items-center gap-2">
-                {{-- Toggle Perangkat --}}
-                <button @click="toggleDevice()"
-                    class="cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition"
+                {{-- Status Perangkat (read-only) --}}
+                <div class="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border"
                     :class="deviceOnline
-                        ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'">
-                    <span x-text="deviceOnline ? 'Matikan Perangkat' : 'Aktifkan Perangkat'"></span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M5.636 5.636a9 9 0 1012.728 0M12 3v6" />
-                    </svg>
-                </button>
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-gray-50 text-gray-500 border-gray-200'">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span x-show="deviceOnline" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5" :class="deviceOnline ? 'bg-green-500' : 'bg-gray-400'"></span>
+                    </span>
+                    <span x-text="deviceOnline ? 'Perangkat Aktif' : 'Perangkat Tidak Aktif'"></span>
+                </div>
 
                 {{-- Ganti Perangkat --}}
                 <form method="POST" action="{{ route('nakes.device-config.reset') }}"
@@ -45,6 +43,69 @@
                         </svg>
                     </button>
                 </form>
+            </div>
+        </div>
+
+        {{-- Info Sesi Monitoring --}}
+        <div x-show="showSessionBanner" x-transition class="mb-4">
+            <!-- Sesi Aktif -->
+            <div x-show="activeSession && deviceOnline"
+                class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-blue-800">Sesi Monitoring Aktif</p>
+                            <p class="text-xs text-blue-600">
+                                <span x-text="activeSession?.medical_record_number ?? '-'"></span>
+                                <span x-show="activeSession?.patient_name"> — <span x-text="activeSession?.patient_name"></span></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-blue-500">Dimulai</p>
+                        <p class="text-sm font-medium text-blue-700" x-text="activeSession?.started_at ?? '-'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sesi Berakhir -->
+            <div x-show="!deviceOnline && lastSession"
+                class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700">Sesi Monitoring Berakhir</p>
+                            <p class="text-xs text-gray-500">
+                                <span x-text="lastSession?.medical_record_number ?? '-'"></span>
+                                <span x-show="lastSession?.patient_name"> — <span x-text="lastSession?.patient_name"></span></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400">Berakhir</p>
+                            <p class="text-sm font-medium text-gray-600" x-text="lastSession?.ended_at ?? '-'"></p>
+                        </div>
+                        <button @click="showSessionBanner = false"
+                            class="p-1 hover:bg-gray-200 rounded-full transition cursor-pointer">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -169,20 +230,53 @@
         </div>
 
         {{-- Grafik Sensor --}}
-        <div class="grid grid-cols-3 gap-3">
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-medium text-[rgb(0,62,48)]">Grafik Vital Sign</p>
+            <div class="flex bg-gray-100 rounded-lg p-0.5">
+                <button @click="chartMode = 'separate'"
+                    class="px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer"
+                    :class="chartMode === 'separate' ? 'bg-white text-[rgb(0,62,48)] shadow-sm' : 'text-gray-500 hover:text-gray-700'">
+                    Terpisah
+                </button>
+                <button @click="chartMode = 'combined'; $nextTick(() => initCombinedChart())"
+                    class="px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer"
+                    :class="chartMode === 'combined' ? 'bg-white text-[rgb(0,62,48)] shadow-sm' : 'text-gray-500 hover:text-gray-700'">
+                    Gabungan
+                </button>
+            </div>
+        </div>
 
+        {{-- Charts: Terpisah --}}
+        <div x-show="chartMode === 'separate'" class="grid grid-cols-3 gap-3">
             @foreach ([['id' => 'hrChart', 'label' => 'Heart Rate', 'unit' => 'bpm'], ['id' => 'spo2Chart', 'label' => 'SpO2', 'unit' => '%'], ['id' => 'tempChart', 'label' => 'Temperature', 'unit' => '°C']] as $chart)
                 <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
                     <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
                         <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $chart['label'] }}</p>
                         <p class="text-[11px] text-gray-400 mt-0.5">{{ $chart['unit'] }} — 10 menit terakhir</p>
                     </div>
-                    {{-- position:relative wajib agar Chart.js bisa hitung tinggi --}}
                     <div class="p-4 relative" style="height:200px;">
                         <canvas id="{{ $chart['id'] }}"></canvas>
                     </div>
                 </div>
             @endforeach
+        </div>
+
+        {{-- Chart: Gabungan --}}
+        <div x-show="chartMode === 'combined'" x-cloak>
+            <div class="bg-white rounded-xl overflow-hidden border border-[rgba(0,83,63,0.1)]">
+                <div class="px-4 py-3 border-b border-[rgba(0,83,63,0.08)]">
+                    <p class="text-sm font-medium text-[rgb(0,62,48)]">Heart Rate, SpO2 & Temperature</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">bpm / % / °C — 10 menit terakhir</p>
+                </div>
+                <div class="p-4 relative" style="height:260px;">
+                    <canvas id="chartVitalSignCombined"></canvas>
+                </div>
+                <div class="flex justify-center gap-5 pb-3 text-xs text-gray-500">
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#ef4444"></span> Heart Rate</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#3b82f6"></span> SpO2</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#f59e0b"></span> Temperature</span>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -196,7 +290,7 @@
             let globalSelectedDeviceId = null;
 
             // Chart instances
-            let hrChart, spo2Chart, tempChart;
+            let hrChart, spo2Chart, tempChart, combinedChart;
 
             function initCharts() {
                 const chartOpts = {
@@ -228,16 +322,107 @@
                 });
             }
 
+            function initCombinedChart() {
+                if (combinedChart) return;
+                const canvas = document.getElementById('chartVitalSignCombined');
+                if (!canvas) return;
+                combinedChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Heart Rate (bpm)',
+                                data: [],
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239,68,68,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y',
+                            },
+                            {
+                                label: 'SpO2 (%)',
+                                data: [],
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59,130,246,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                            },
+                            {
+                                label: 'Temperature (°C)',
+                                data: [],
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245,158,11,0.05)',
+                                borderWidth: 1.5,
+                                pointRadius: 2,
+                                tension: 0.4,
+                                yAxisID: 'y2',
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 300 },
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } },
+                            y: {
+                                position: 'left',
+                                min: 40, max: 160,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: { font: { size: 9 }, color: '#ef4444' },
+                                title: { display: true, text: 'bpm', font: { size: 9 }, color: '#ef4444' }
+                            },
+                            y1: {
+                                position: 'right',
+                                min: 80, max: 100,
+                                grid: { drawOnChartArea: false },
+                                ticks: { font: { size: 9 }, color: '#3b82f6' },
+                                title: { display: true, text: '%', font: { size: 9 }, color: '#3b82f6' }
+                            },
+                            y2: {
+                                position: 'right',
+                                min: 34, max: 41,
+                                grid: { drawOnChartArea: false },
+                                ticks: { font: { size: 9 }, color: '#f59e0b' },
+                                title: { display: true, text: '°C', font: { size: 9 }, color: '#f59e0b' },
+                                offset: true
+                            }
+                        },
+                        elements: { point: { radius: 2, hoverRadius: 4 }, line: { tension: 0.3, borderWidth: 1.5 } }
+                    }
+                });
+                // Load existing data if available
+                if (hrChart?.data?.labels?.length > 0) {
+                    combinedChart.data.labels = hrChart.data.labels;
+                    combinedChart.data.datasets[0].data = hrChart.data.datasets[0].data;
+                    combinedChart.data.datasets[1].data = spo2Chart.data.datasets[0].data;
+                    combinedChart.data.datasets[2].data = tempChart.data.datasets[0].data;
+                    combinedChart.update('none');
+                }
+            }
+
             function updateCharts(history) {
                 if (!history) {
-                    [hrChart, spo2Chart, tempChart].forEach(c => {
-                        if (c) { c.data.labels = []; c.data.datasets[0].data = []; c.update('none'); }
+                    [hrChart, spo2Chart, tempChart, combinedChart].forEach(c => {
+                        if (c) { c.data.labels = []; c.data.datasets.forEach(ds => ds.data = []); c.update('none'); }
                     });
                     return;
                 }
                 hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = history.heart_rate; hrChart.update('none');
                 spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = history.spo2; spo2Chart.update('none');
                 tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = history.temperature; tempChart.update('none');
+                if (combinedChart) {
+                    combinedChart.data.labels = history.labels;
+                    combinedChart.data.datasets[0].data = history.heart_rate;
+                    combinedChart.data.datasets[1].data = history.spo2;
+                    combinedChart.data.datasets[2].data = history.temperature;
+                    combinedChart.update('none');
+                }
             }
 
             function dashboard() {
@@ -245,6 +430,10 @@
                     selectedDeviceId: null,
                     latest: null,
                     deviceOnline: false,
+                    chartMode: 'separate',
+                    activeSession: null,
+                    lastSession: null,
+                    showSessionBanner: true,
 
                     async init() {
                         initCharts();
@@ -257,6 +446,8 @@
                                 globalSelectedDeviceId = this.selectedDeviceId;
                                 this.latest = device.latest;
                                 this.deviceOnline = device.status === 'online';
+                                this.activeSession = device.active_session ?? null;
+                                this.showSessionBanner = true;
                                 updateCharts(device.history);
                                 window.dispatchEvent(new CustomEvent('deviceSelected', {
                                     detail: { deviceId: this.selectedDeviceId }
@@ -272,7 +463,28 @@
                         if (!window.Echo || !this.selectedDeviceId) return;
                         window.Echo.private(`device.${this.selectedDeviceId}`)
                             .listen('.device.status.changed', (e) => {
+                                const wasOnline = this.deviceOnline;
                                 this.deviceOnline = e.status === 'online';
+
+                                // When device goes offline, move activeSession to lastSession
+                                if (wasOnline && e.status === 'offline' && this.activeSession) {
+                                    this.lastSession = {
+                                        ...this.activeSession,
+                                        ended_at: new Date().toLocaleString('id-ID', {
+                                            day: '2-digit', month: 'short', year: 'numeric',
+                                            hour: '2-digit', minute: '2-digit'
+                                        })
+                                    };
+                                    this.activeSession = null;
+                                    this.showSessionBanner = true;
+                                }
+
+                                // When device goes online, clear lastSession and fetch new active session
+                                if (!wasOnline && e.status === 'online') {
+                                    this.lastSession = null;
+                                    this.showSessionBanner = true;
+                                    this.fetchActiveSession();
+                                }
                             })
                             .listen('.sensor.data.received', (e) => {
                                 this.latest = e.latest;
@@ -280,25 +492,15 @@
                             });
                     },
 
-                    async toggleDevice() {
-                        const newStatus = this.deviceOnline ? 'offline' : 'online';
-                        this.deviceOnline = newStatus === 'online';
+                    async fetchActiveSession() {
                         try {
-                            const res = await fetch('/nakes/device-status', {
-                                method: 'PATCH',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                },
-                                body: JSON.stringify({ status: newStatus }),
-                            });
+                            const res = await fetch('/api/devices');
                             const json = await res.json();
-                            if (!json.success) {
-                                this.deviceOnline = newStatus !== 'online';
+                            if (json.success && json.data.length > 0) {
+                                this.activeSession = json.data[0].active_session ?? null;
                             }
                         } catch (e) {
-                            this.deviceOnline = newStatus !== 'online';
-                            console.error('Error toggling device:', e);
+                            console.error('Error fetching active session:', e);
                         }
                     },
 

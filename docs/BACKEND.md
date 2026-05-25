@@ -21,10 +21,12 @@ app/
       DashboardController.php           # Role-based view resolver + API device list
       UserController.php                # CRUD user (superadmin)
       ManajemenAlatController.php       # CRUD perangkat IoT (superadmin)
-      LaporanController.php             # Laporan HTML + PDF nakes/dokter
+      LaporanController.php             # Laporan HTML + PDF nakes/dokter (real data)
       SuperadminLaporanController.php   # Laporan HTML + PDF superadmin
+      PatientController.php             # Input data pasien + link ke session
+      ProfileController.php             # Edit profil user
       Api/
-        DeviceDataController.php        # Autentikasi device, system status, device config
+        DeviceDataController.php        # Autentikasi device, system status, session lifecycle
         SensorDataController.php        # Sensor data endpoint (store, latest, history)
         InstructionController.php       # Instruksi dokter-nakes (CRUD + report + complete)
     Middleware/
@@ -45,32 +47,38 @@ app/
   Models/
     User.php                            # users
     Devices.php                         # devices (PK: device_id string, ML fields)
-    SensorData.php                      # sensor_datas
+    SensorData.php                      # sensor_datas (temporary, realtime dashboard)
+    SensorReading.php                   # sensor_readings (finalized, untuk laporan)
     SystemStatus.php                    # system_statuses
     ApiKey.php                          # api_keys
     Patient.php                         # patients
     MedicalRecord.php                   # medical_records
     ActivityLog.php                     # activity_log
     Instruction.php                     # instructions
+    MonitoringSession.php               # monitoring_sessions
     NakesDeviceConfig.php               # nakes_device_configs
+    DeviceMonitoring.php                # device_monitorings (dokter monitor device)
   Services/
     AuthService.php                     # Login, logout, reset password
     DeviceService.php                   # Sensor data CRUD + caching
     UserService.php                     # User CRUD
     InstructionService.php              # Instruksi dokter-nakes business logic
-    SensorService.php                   # Sensor data operations + caching + broadcast
+    SensorService.php                   # Sensor data operations + caching + broadcast + trigger ML
     PatientMonitoringService.php        # Integrasi ML API (Hugging Face)
+    MonitoringSessionService.php        # Session lifecycle: create, finalize, link patient
+    ReportService.php                   # Report data: getReportData, getHistoryForChart, getStats
   Events/
     InstructionSent.php                 # Broadcast saat dokter kirim instruksi
     InstructionStatusUpdated.php        # Broadcast saat nakes selesaikan instruksi
     InstructionReportSubmitted.php      # Broadcast saat nakes submit laporan
     DeviceStatusChanged.php             # Broadcast saat device online/offline
     SensorDataReceived.php              # Broadcast saat data sensor masuk
+    ActivityLogCreated.php              # Broadcast activity log real-time
   Jobs/
     ProcessDeviceData.php               # Queue: proses system status device
     ProcessSensorData.php               # Queue: proses sensor data
 database/
-  migrations/                           # 11 file migrasi
+  migrations/                           # 15 file migrasi
   seeders/
     DatabaseSeeder.php                  # Memanggil UserSeeder + DeviceSeeder
     UserSeeder.php                      # 3 akun (superadmin, dokter, nakes)
@@ -85,19 +93,23 @@ simulasi_py/
 
 ## Database Schema
 
-### Tabel Utama (8 tabel domain)
+### Tabel Utama (12 tabel domain)
 
 | Tabel | Primary Key | Keterangan |
 |-------|-------------|------------|
 | `users` | id (auto-increment) | Akun pengguna (role: nakes/dokter/superadmin) |
-| `devices` | device_id (string 50) | Perangkat IoT terdaftar |
-| `sensor_datas` | id (auto-increment) | Data vital sign dari sensor |
+| `devices` | device_id (string 50) | Perangkat IoT terdaftar + ML prediction fields |
+| `sensor_datas` | id (auto-increment) | Data vital sign temporary (realtime dashboard) |
+| `sensor_readings` | id (auto-increment) | Data vital sign finalized (untuk laporan) |
 | `system_statuses` | device_id (string) | Status sistem perangkat (battery, signal) |
 | `api_keys` | id (auto-increment) | API key untuk autentikasi device |
-| `patients` | id (auto-increment) | Data pasien |
+| `patients` | id (auto-increment) | Data pasien (no_rekam_medis, nik, nama, dll) |
 | `medical_records` | id (auto-increment) | Rekam medis pasien |
-| `activity_log` | id (auto-increment) | Log aktivitas sistem |
+| `activity_log` | id (auto-increment) | Log aktivitas sistem (16 event types) |
 | `instructions` | id (auto-increment) | Instruksi dokter-nakes + laporan nakes |
+| `monitoring_sessions` | id (auto-increment) | Sesi monitoring per device ON/OFF |
+| `nakes_device_configs` | id (auto-increment) | Konfigurasi device untuk nakes |
+| `device_monitorings` | id (auto-increment) | Dokter monitoring device |
 
 > Detail lengkap: [DATABASE.md](DATABASE.md)
 
@@ -151,11 +163,18 @@ simulasi_py/
 
 | Method | Endpoint | Keterangan |
 |--------|----------|------------|
-| GET | `/api/devices` | Daftar semua perangkat + data card + history grafik |
+| GET | `/api/devices` | Daftar semua perangkat + data card + history + active_session |
 | GET | `/api/device/{id}/sensor-data/latest` | Data sensor terbaru (session auth) |
 | GET | `/api/device/{id}/sensor-data/history` | Riwayat sensor (session auth) |
 | GET | `/api/device/{id}/prediction` | Prediksi ML untuk device |
 | PATCH | `/nakes/device-status` | Toggle device online/offline (nakes) |
+
+### Patient & Laporan API (Session Auth)
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| POST | `/nakes/input-data-pasien` | Simpan data pasien + link ke active session |
+| GET | `/nakes/laporan/session-data` | AJAX: data laporan per session (HTML partials + raw data) |
 
 ---
 
@@ -193,6 +212,22 @@ simulasi_py/
 - `getLatestSensorData(string)` — Ambil data terakhir (cache 5 menit)
 - `triggerPredictionIfNeeded(string)` — Trigger prediksi ML setiap 5 data baru (patokan: `ml_predicted_at`)
 - `runPrediction(string)` — Jalankan ML prediction, simpan hasil + probabilities, broadcast ulang
+
+### MonitoringSessionService
+- `createSession(deviceId, userId)` — Buat session baru saat device ON + auto-generate nomor rekam medis
+- `finalizeSession(sessionId)` — Copy sensor_data → sensor_readings, hapus SEMUA sensor_data device, update status completed
+- `cancelSession(sessionId)` — Batalkan session, hapus sensor_data
+- `linkPatient(sessionId, patientData)` — Buat/link data pasien ke session
+- `getSessionsForDevice(deviceId)` — Daftar session untuk filter laporan
+- `getCompletedSessionsForDevice(deviceId)` — Daftar completed session (dropdown laporan)
+- `getActiveSession(deviceId)` — Ambil active session untuk device
+- `generateMedicalRecordNumber(deviceId)` — Format: RM-{DEVICE}-{YYYYMMDD}-{SEQ}
+
+### ReportService
+- `getReportData(sessionId, vitalSigns[])` — Query sensor_readings untuk laporan
+- `getLatestReading(sessionId)` — Vital sign terakhir untuk summary card
+- `getHistoryForChart(sessionId, vitalSigns[])` — Labels + data arrays untuk Chart.js
+- `getSessionStats(sessionId)` — Statistik (avg, min, max) per vital sign
 
 ---
 
@@ -329,31 +364,52 @@ python simulator.py
 - [x] **Endpoint `/api/devices` Gabungan**
   - Return data card (latest) + data grafik (history 10 menit) dalam satu response
   - Parameter `?minutes=N` untuk rentang waktu grafik
+  - Include `active_session` info untuk setiap device
+
+- [x] **Monitoring Session System**
+  - `MonitoringSession` model + migration (status: active/pending/completed/cancelled)
+  - `SensorReading` model + migration (finalized data untuk laporan)
+  - `MonitoringSessionService`: create, finalize, cancel, linkPatient, auto-generate RM
+  - Auto-create session saat device ON (di `DeviceDataController`)
+  - Auto-finalize session saat device OFF: copy sensor_data → sensor_readings, hapus SEMUA sensor_data device
+  - Nomor rekam medis auto-generate: `RM-{DEVICE_ID}-{YYYYMMDD}-{SEQ}`
+
+- [x] **Backend Input Data Pasien**
+  - `PatientController::store()` — validasi + simpan ke `patients` + link ke active session
+  - Route: `POST /nakes/input-data-pasien`
+  - Support input dari halaman input-data-pasien dan modal di halaman laporan
+
+- [x] **Laporan dari Database (Nakes & Dokter)**
+  - `LaporanController` menggunakan real data dari `monitoring_sessions` + `sensor_readings`
+  - `ReportService`: getReportData, getHistoryForChart, getSessionStats, getLatestReading
+  - AJAX session loading: `GET /nakes/laporan/session-data` (tanpa refresh halaman)
+  - Partial views: `_laporan-patient`, `_laporan-content`, `_laporan-sidebar`
+  - PDF download dengan data real (DomPDF + QuickChart.io)
+  - Vital sign selection (checkbox) filter data yang ditampilkan
+
+- [x] **Activity Log**
+  - 16 event types terinstrumentasi
+  - `ActivityLog::log()` dipanggil di berbagai service
+  - Realtime broadcast ke superadmin dashboard via WebSocket
+
+- [x] **Device Monitoring (Dokter)**
+  - `DeviceMonitoring` model — dokter bisa monitor device tertentu
+  - `NakesDeviceConfig` model — nakes di-assign ke device
 
 ### Belum Dikerjakan
-
-- [ ] **Backend Input Data Pasien**
-  - POST handler untuk form input data pasien
-  - Simpan ke tabel `patients`
 
 - [ ] **Backend CRUD User (Routing)**
   - UserController sudah ada method-nya
   - Belum ada route di web.php
   - Belum terhubung ke halaman manajemen-user
 
-- [ ] **Laporan dari Database**
-  - LaporanController masih pakai dummy data
+- [ ] **Laporan Superadmin dari Database**
   - SuperadminLaporanController masih pakai dummy data
-  - Query database sudah ada (commented out) tapi belum diaktifkan
+  - Perlu query dari monitoring_sessions + sensor_readings
 
 - [ ] **Device Config dari Database**
   - `getDeviceConfig()` masih hardcoded
   - Perlu baca dari database
-
-- [ ] **Activity Log**
-  - Model dan migrasi sudah ada
-  - Belum ada yang menulis ke tabel ini
-  - Belum ada controller dan route
 
 - [ ] **Integrasi IoT Real**
   - Simulator sudah jalan
@@ -374,18 +430,18 @@ python simulator.py
 - Warning/highlight saat instruksi diselesaikan nakes
 - Badge counter instruksi aktif di sidebar
 
-### 3. Backend Laporan
-- Aktifkan query database di LaporanController
-- Aktifkan query database di SuperadminLaporanController
-- Hapus dummy data
+### 3. ~~Backend Laporan~~ (Selesai 24 Mei 2026)
+- ~~Aktifkan query database di LaporanController~~ → real data via ReportService
+- ~~Aktifkan query database di SuperadminLaporanController~~ → masih dummy
+- ~~Hapus dummy data~~ → sudah diganti real data
 
 ### 4. CRUD User Routing
 - Daftarkan route untuk UserController
 - Hubungkan ke halaman manajemen-user
 
-### 5. Activity Log
-- Buat activity logging di setiap aksi penting
-- Model dan migrasi sudah ada
+### 5. ~~Activity Log~~ (Selesai 24 Mei 2026)
+- ~~Buat activity logging di setiap aksi penting~~ → 16 event types
+- ~~Model dan migrasi sudah ada~~ → sudah terinstrumentasi
 
 ---
 
@@ -393,15 +449,19 @@ python simulator.py
 
 - Instruction endpoint ada di `api.php` dengan middleware `web` + `auth` (session auth)
 - `UserController` punya method tapi belum ada route di `web.php`
-- `LaporanController` dan `SuperadminLaporanController` masih pakai dummy data
+- `LaporanController` sudah pakai real data, `SuperadminLaporanController` masih dummy
 - `DeviceDataController@getDeviceConfig` mengembalikan nilai hardcoded
 - Cache SensorService: cleared on write (broadcast menggantikan polling)
 - System status menggunakan queue (`ProcessDeviceData`) untuk async processing
-- Broadcasting via Reverb: 5 event (3 instruksi + 2 realtime dashboard)
-- Endpoint `/api/devices` return data gabungan: card + grafik dalam satu response
+- Broadcasting via Reverb: 6 event (3 instruksi + 2 realtime dashboard + 1 activity log)
+- Endpoint `/api/devices` return data gabungan: card + grafik + active_session
 - ML prediction disimpan di tabel `devices` (bukan `sensor_datas`)
 - Simulator pakai `threading.Event` untuk zero-delay stop saat device dimatikan
+- `finalizeSession()` menghapus SEMUA `sensor_data` milik device (bukan hanya rentang waktu session)
+- AJAX session selection: partial HTML di-render server, di-inject via `innerHTML`, Chart.js re-init
+- Alpine.js partials: gunakan `onclick` global function (Alpine directives tidak work di innerHTML)
+- Alpine.js data passing: gunakan `window.__laporanInit` global variable (hindari `@json()` di atribut HTML)
 
 ---
 
-*Last updated: 18 Mei 2026*
+*Last updated: 24 Mei 2026*

@@ -103,12 +103,126 @@ GET /api/device/{device_id}/config
 GET /api/devices
 ```
 
-Mengembalikan daftar semua perangkat beserta data card (latest) dan data grafik (history 10 menit).
+Mengembalikan daftar semua perangkat beserta data card (latest), data grafik (history 10 menit), dan info active session.
 
 **Query Parameters:**
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `minutes` | integer | 10 | Rentang waktu grafik (menit) |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "device_id": "DEVICE_01",
+      "device_name": "Ambulans 01",
+      "status": "online",
+      "latest": { "heart_rate": 85, "spo2": 98, "temperature": 36.5, "status": "normal" },
+      "history": [ ... ],
+      "ml_prediction": "...",
+      "ml_condition": "WARNING",
+      "ml_probabilities": { "membaik": 11, "stabil": 26, "memburuk": 63 },
+      "active_session": {
+        "id": 1,
+        "medical_record_number": "RM-DEVICE_01-20260524-001",
+        "status": "active",
+        "started_at": "2026-05-24T08:00:00Z",
+        "patient": null
+      }
+    }
+  ]
+}
+```
+
+> `active_session` berisi data monitoring session yang sedang aktif untuk device tersebut (null jika device offline).
+
+---
+
+### Patient Data (Session Auth)
+
+#### Input Data Pasien
+
+```
+POST /nakes/input-data-pasien
+```
+
+Menyimpan data pasien dan meng-link-nya ke active monitoring session.
+
+**Request Body:**
+```json
+{
+  "session_id": 1,
+  "nama": "Budi Santoso",
+  "nik": "3201234567890001",
+  "tanggal_lahir": "1990-05-15",
+  "umur": 36,
+  "jenis_kelamin": "Laki-laki",
+  "penyakit_alergi": "Asma",
+  "catatan": "Pasien dalam kondisi sadar"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | integer | Yes | ID monitoring session (active) |
+| `nama` | string | No | Nama pasien |
+| `nik` | string | No | NIK pasien (16 digit) |
+| `tanggal_lahir` | date | No | Format: YYYY-MM-DD |
+| `umur` | integer | No | Umur pasien |
+| `jenis_kelamin` | string | No | Laki-laki / Perempuan |
+| `penyakit_alergi` | string | No | Riwayat penyakit/alergi |
+| `catatan` | string | No | Catatan tambahan |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Data pasien berhasil disimpan",
+  "data": {
+    "patient_id": 1,
+    "session_id": 1,
+    "medical_record_number": "RM-DEVICE_01-20260524-001"
+  }
+}
+```
+
+---
+
+### Laporan API (Session Auth)
+
+#### Get Session Data (AJAX)
+
+```
+GET /nakes/laporan/session-data?session_id=1&vital_signs[]=heart_rate&vital_signs[]=spo2&vital_signs[]=temperature
+```
+
+Mengembalikan data laporan untuk satu session dalam format JSON (untuk AJAX load tanpa refresh halaman).
+
+**Query Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | integer | Yes | ID monitoring session (completed) |
+| `vital_signs[]` | array | No | Vital signs yang ditampilkan (default: semua) |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "sessionInfo": { "id": 1, "medical_record_number": "RM-DEVICE_01-20260524-001", "status": "completed" },
+    "chartData": { "labels": [...], "datasets": { "heart_rate": [...], "spo2": [...], "temperature": [...] } },
+    "latestReading": { "heart_rate": 85, "spo2": 98, "temperature": 36.5 },
+    "stats": { "heart_rate": { "avg": 82, "min": 75, "max": 95 }, ... },
+    "patientHtml": "<div>...</div>",
+    "contentHtml": "<div>...</div>",
+    "sidebarHtml": "<div>...</div>"
+  }
+}
+```
+
+> `patientHtml`, `contentHtml`, `sidebarHtml` adalah rendered HTML partials yang langsung di-inject ke DOM via JavaScript.
 
 ---
 
@@ -791,7 +905,9 @@ curl -X POST http://localhost:8000/api/device/DEVICE_01/system-status \
 | [BACKEND.md](BACKEND.md) | Arsitektur backend, service layer |
 | [DATABASE.md](DATABASE.md) | Struktur database, ERD |
 | [FRONTEND.md](FRONTEND.md) | Struktur frontend, routes |
+| [LAPORAN_SYSTEM.md](LAPORAN_SYSTEM.md) | Desain sistem laporan & monitoring session |
+| [DEMO.md](DEMO.md) | Panduan instalasi & demo |
 
 ---
 
-*Last updated: 23 Mei 2026*
+*Last updated: 24 Mei 2026*

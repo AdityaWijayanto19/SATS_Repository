@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\ActivityLog;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -19,8 +21,11 @@ class UserController extends Controller
     {
         $user = $this->userService->createUser($request->validated());
 
+        $admin = Auth::user();
+        ActivityLog::log('user.added', "Admin {$admin->name} menambahkan user {$user->name}", $admin->name, $admin->role);
+
         return redirect()
-            ->route('admin.manage-users.index')
+            ->route('superadmin.manajemen-user')
             ->with('success', 'User berhasil dibuat.');
     }
 
@@ -32,16 +37,20 @@ class UserController extends Controller
         );
 
         return redirect()
-            ->route('admin.manage-users.index')
+            ->route('superadmin.manajemen-user')
             ->with('success', 'User berhasil diperbarui.');
     }
 
     public function destroy(User $user): RedirectResponse
     {
+        $userName = $user->name;
         $this->userService->deleteUser($user);
 
+        $admin = Auth::user();
+        ActivityLog::log('user.deleted', "Admin {$admin->name} menghapus user {$userName}", $admin->name, $admin->role);
+
         return redirect()
-            ->route('admin.manage-users.index')
+            ->route('superadmin.manajemen-user')
             ->with('success', 'User berhasil dihapus.');
     }
 }

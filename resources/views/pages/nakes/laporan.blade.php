@@ -2,7 +2,183 @@
 @section('title', 'SATS Monitoring - Laporan')
 
 @section('content')
-<main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)] min-h-screen">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+window.__laporanInit = {
+    sessionId: {{ $sessionId ?? 'null' }},
+    deviceId: '{{ $deviceId ?? '' }}',
+    chartData: @json($chartData),
+    vitalSigns: @json($vitalSigns ?? ['heart_rate', 'spo2', 'temperature'])
+};
+
+function laporanPage() {
+    var initial = window.__laporanInit;
+    return {
+        showPatientModal: false,
+        selectedSessionId: initial.sessionId ? String(initial.sessionId) : '',
+        selectedSessionLabel: '',
+        deviceId: initial.deviceId,
+        vitalSigns: initial.vitalSigns || ['heart_rate', 'spo2', 'temperature'],
+        loading: false,
+        chartInstance: null,
+        chartData: initial.chartData,
+
+        init() {
+            // Register global function for partial buttons
+            window.openPatientModal = () => { this.showPatientModal = true; };
+
+            // Set session label from selected option
+            this.$nextTick(() => {
+                const select = this.$el.querySelector('select[x-model="selectedSessionId"]');
+                if (select && this.selectedSessionId) {
+                    const opt = select.options[select.selectedIndex];
+                    this.selectedSessionLabel = opt ? opt.text.trim() : '';
+                }
+                // Init chart if data exists
+                if (this.chartData) {
+                    this.initChart(this.chartData);
+                }
+            });
+        },
+
+        async loadSession() {
+            if (!this.selectedSessionId) return;
+
+            this.loading = true;
+            const vs = this.vitalSigns.map(v => 'vital_signs[]=' + encodeURIComponent(v)).join('&');
+            const url = `/nakes/laporan/session-data?session_id=${this.selectedSessionId}&${vs}`;
+
+            try {
+                const resp = await fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!resp.ok) throw new Error('Gagal memuat data sesi');
+                const data = await resp.json();
+
+                // Update patient section
+                this.$refs.patientSection.innerHTML = data.patientHtml;
+
+                // Update content section
+                this.$refs.contentSection.innerHTML = data.contentHtml;
+
+                // Update sidebar
+                this.$refs.sidebarSection.innerHTML = data.sidebarHtml;
+
+                // Update session label
+                const select = this.$el.querySelector('select[x-model="selectedSessionId"]');
+                if (select) {
+                    const opt = select.options[select.selectedIndex];
+                    this.selectedSessionLabel = opt ? opt.text.trim() : '';
+                }
+
+                // Re-init chart
+                this.chartData = data.chartData;
+                this.$nextTick(() => {
+                    if (data.chartData) {
+                        this.initChart(data.chartData);
+                    }
+                });
+
+            } catch (err) {
+                console.error(err);
+                alert('Gagal memuat data sesi. Silakan coba lagi.');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        initChart(chartData) {
+            if (!chartData || !chartData.labels) return;
+            const canvas = document.getElementById('chartVitalSigns');
+            if (!canvas) return;
+
+            if (this.chartInstance) {
+                this.chartInstance.destroy();
+                this.chartInstance = null;
+            }
+
+            const datasets = [];
+            const vs = this.vitalSigns;
+
+            if (vs.includes('heart_rate') && chartData.datasets.heart_rate) {
+                datasets.push({
+                    label: 'Heart Rate (bpm)',
+                    data: chartData.datasets.heart_rate,
+                    borderColor: 'rgb(220,38,38)',
+                    backgroundColor: 'rgba(220,38,38,0.05)',
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    tension: 0.4,
+                    yAxisID: 'y',
+                });
+            }
+            if (vs.includes('spo2') && chartData.datasets.spo2) {
+                datasets.push({
+                    label: 'SpO2 (%)',
+                    data: chartData.datasets.spo2,
+                    borderColor: 'rgb(59,130,246)',
+                    backgroundColor: 'rgba(59,130,246,0.05)',
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    tension: 0.4,
+                    yAxisID: 'y1',
+                });
+            }
+            if (vs.includes('temperature') && chartData.datasets.temperature) {
+                datasets.push({
+                    label: 'Suhu (°C)',
+                    data: chartData.datasets.temperature,
+                    borderColor: 'rgb(234,179,8)',
+                    backgroundColor: 'rgba(234,179,8,0.05)',
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    tension: 0.4,
+                    yAxisID: 'y2',
+                });
+            }
+
+            if (datasets.length === 0) return;
+
+            const ctx = canvas.getContext('2d');
+            this.chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: chartData.labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { font: { size: 8 }, maxRotation: 90, maxTicksLimit: 20 } },
+                        y: {
+                            type: 'linear', position: 'left',
+                            title: { display: true, text: 'HR (bpm)', font: { size: 9 } },
+                            ticks: { font: { size: 9 } },
+                        },
+                        y1: {
+                            type: 'linear', position: 'right', min: 80, max: 100,
+                            title: { display: true, text: 'SpO2 (%)', font: { size: 9 } },
+                            ticks: { font: { size: 9 } },
+                            grid: { drawOnChartArea: false },
+                        },
+                        y2: {
+                            type: 'linear', position: 'right',
+                            title: { display: true, text: 'Suhu (°C)', font: { size: 9 } },
+                            ticks: { font: { size: 9 } },
+                            grid: { drawOnChartArea: false },
+                        },
+                    }
+                }
+            });
+        }
+    };
+}
+</script>
+
+<main class="flex-1 overflow-y-auto p-6 bg-[rgba(230,238,236,0.5)] min-h-screen"
+    x-data="laporanPage()">
 
     <h1 class="text-3xl font-bold text-[rgb(0,62,48)] mb-6">Laporan</h1>
 
@@ -11,269 +187,192 @@
         <!-- Konten Laporan (Kiri) -->
         <div class="flex-1 space-y-4">
 
-            <!-- Identitas Pasien -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                <h2 class="text-base font-semibold text-[rgb(0,62,48)] text-center mb-4">
-                    Laporan Medis Pasien: {{ $pasien?->no_rekam_medis ?? '24E56' }} – {{ $pasien?->nama_lengkap ?? 'Budi Santoso' }}
-                </h2>
-                <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-700">
-                    <div>
-                        <p><span class="font-semibold">Nama Lengkap</span> : {{ $pasien?->nama_lengkap ?? 'Budi Santoso' }}</p>
-                        <p><span class="font-semibold">NIK</span> : {{ $pasien?->nik ?? '33161224234777' }}</p>
-                        <p><span class="font-semibold">Usia</span> : {{ $pasien?->usia ?? '59' }} tahun</p>
-                        <p><span class="font-semibold">Jenis Kelamin</span> : {{ $pasien?->jenis_kelamin == 'L' ? 'Laki-laki' : ($pasien?->jenis_kelamin == 'P' ? 'Perempuan' : 'Laki-laki') }}</p>
-                    </div>
-                    <div>
-                        <p><span class="font-semibold">Penyakit/Alergi</span> : {{ $pasien?->penyakit_alergi ?? 'Serangan Jantung' }}</p>
-                        <p class="mt-1"><span class="font-semibold">Catatan Tambahan</span> : {{ $pasien?->catatan_tambahan ?? 'Harus dipantau setiap menitnya' }}</p>
-                    </div>
+            <!-- Filter: Session + Vital Signs -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4 text-[rgb(0,62,48)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                    </svg>
+                    <span class="text-sm font-medium text-[rgb(0,62,48)]">Perangkat: {{ $deviceId ?? '-' }}</span>
                 </div>
-            </div>
-
-            <!-- 
-                Banner Prediksi ML
-                TODO: Isi $prediksi dari controller via endpoint GET /api/device/{device_id}/prediction
-                Struktur object: risk_level ('normal'|'warning'|'critical'), risk_percent, timeframe_minutes, message
-            -->
-            @php
-                $riskLevel  = $prediksi->risk_level        ?? 'warning';
-                $riskPercent = $prediksi->risk_percent      ?? 20;
-                $riskMenit  = $prediksi->timeframe_minutes  ?? 15;
-                $riskPesan  = $prediksi->message            ?? 'Kondisi pasien berpotensi memburuk ' . $riskPercent . '% dalam ' . $riskMenit . ' menit ke depan berdasarkan tren Heart Rate dan SpO2.';
-
-                [$riskDot, $riskBadgeCls, $riskBadgeLabel, $riskBannerBg] = match($riskLevel) {
-                    'critical' => ['bg-red-500',    'bg-red-100 text-red-700',       'Kritis',    'bg-red-50 border-red-200'],
-                    'normal'   => ['bg-green-500',  'bg-green-100 text-green-700',   'Normal',    'bg-green-50 border-green-200'],
-                    default    => ['bg-orange-400', 'bg-orange-100 text-orange-700', 'Perhatian', 'bg-[rgba(0,62,48,0.05)] border-[rgba(0,62,48,0.18)]'],
-                };
-            @endphp
-            <div class="flex items-center gap-4 {{ $riskBannerBg }} border rounded-xl px-5 py-3.5">
-                <span class="w-2 h-2 rounded-full {{ $riskDot }} flex-shrink-0"></span>
-                <div class="flex-1">
-                    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
-                    <p class="text-sm font-medium text-[rgb(0,62,48)]">{{ $riskPesan }}</p>
-                </div>
-                <span class="text-[10px] font-medium px-2.5 py-1 rounded {{ $riskBadgeCls }} flex-shrink-0">
-                    {{ $riskBadgeLabel }}
-                </span>
-            </div>
-
-            <!-- Grafik Tekanan Darah + Nilai Vital + Klasifikasi ML -->
-            <div class="grid grid-cols-5 gap-4">
-
-                <!-- Grafik Tekanan Darah -->
-                <div class="col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <p class="text-xs font-semibold text-gray-600 text-center mb-2">Tekanan Darah (Sistolik &amp; Diastolik)</p>
-                    <div class="w-full" style="height: 180px;">
-                        <canvas id="chartTekananDarah"></canvas>
-                    </div>
-                    <div class="flex justify-center gap-4 mt-2 text-xs text-gray-500">
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-4 h-0.5 bg-red-500"></span> Sistolik
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <span class="inline-block w-4 h-0.5 bg-blue-500"></span> Diastolik
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Nilai Vital + Klasifikasi ML -->
-                <div class="col-span-2 flex flex-col gap-4">
-
-                    <!-- Nilai Vital -->
-                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                        <p class="text-sm font-bold text-[rgb(0,62,48)] mb-3">Nilai Vital</p>
-                        <div class="flex justify-around items-center">
-                            <div class="text-center">
-                                <p class="text-xs text-gray-500 mb-1">Detak Jantung</p>
-                                <p class="text-4xl font-black text-gray-800 leading-none">{{ $vitalTerbaru?->detak_jantung ?? '72' }}</p>
-                                <p class="text-xs text-gray-400 mt-1">bpm</p>
-                            </div>
-                            <div class="w-px h-12 bg-gray-200"></div>
-                            <div class="text-center">
-                                <p class="text-xs text-gray-500 mb-1">SPO2</p>
-                                <p class="text-4xl font-black text-gray-800 leading-none">
-                                    {{ $vitalTerbaru?->spo2 ?? '98' }}<span class="text-2xl">%</span>
-                                </p>
-                                <p class="text-xs text-gray-400 mt-1">saturasi</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Klasifikasi ML -->
-                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                        <p class="text-sm font-bold text-[rgb(0,62,48)] mb-2">Hasil Klasifikasi ML</p>
-                        @php
-                            $status = $vitalTerbaru?->klasifikasi ?? 'Normal';
-                            $statusColor = match($status) {
-                                'Warning'  => 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                                'Critical' => 'bg-red-100 text-red-700 border-red-300',
-                                default    => 'bg-green-100 text-green-700 border-green-300',
-                            };
-                        @endphp
-                        <div class="flex justify-center mb-2">
-                            <span class="px-5 py-1 rounded-full border text-sm font-semibold {{ $statusColor }}">
-                                {{ $status }}
-                            </span>
-                        </div>
-                        <p class="text-xs text-gray-600 text-center">
-                            <span class="font-semibold">Klasifikasi Otomatis :</span><br>
-                            {{ $vitalTerbaru?->keterangan_klasifikasi ?? 'Kondisi Pasien Stabil' }}
-                        </p>
-                        <div class="flex justify-center gap-3 mt-3 text-xs text-gray-500">
-                            <span class="flex items-center gap-1">
-                                <span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span> Normal
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block"></span> Warning
-                            </span>
-                            <span class="flex items-center gap-1">
-                                <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Critical
-                            </span>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- Tabel Riwayat Kondisi Pasien -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div class="bg-[rgba(0,62,48,0.06)] px-4 py-3 border-b border-gray-200">
-                    <p class="text-sm font-semibold text-[rgb(0,62,48)] text-center">Riwayat Kondisi Pasien</p>
-                </div>
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-100">
-                            <th class="py-2 px-4 text-left font-semibold text-gray-600 w-32">Waktu</th>
-                            <th class="py-2 px-4 text-left font-semibold text-gray-600">Riwayat</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($riwayat ?? [] as $item)
-                            <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                <td class="py-2 px-4 text-gray-500 font-mono text-xs">{{ $item->waktu }}</td>
-                                <td class="py-2 px-4 text-gray-700">{{ $item->keterangan }}</td>
-                            </tr>
-                        @empty
-                            @foreach([
-                                ['10.38.59', 'Kondisi Pasien Warning'],
-                                ['10.40.59', 'Detak jantung meningkat'],
-                                ['10.42.59', 'Tabung Oksigen Dipasang'],
-                                ['10.44.59', 'Tekanan Darah Menurun'],
-                            ] as $row)
-                            <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                <td class="py-2 px-4 text-gray-500 font-mono text-xs">{{ $row[0] }}</td>
-                                <td class="py-2 px-4 text-gray-700">{{ $row[1] }}</td>
-                            </tr>
+                <div class="flex flex-wrap gap-3 items-end">
+                    <!-- Session -->
+                    <div class="flex-1 min-w-[250px]">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Sesi Monitoring</label>
+                        <select x-model="selectedSessionId" @change="loadSession()"
+                            class="w-full text-sm border border-gray-200 rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-[rgb(0,62,48)]">
+                            <option value="">-- Pilih Sesi --</option>
+                            @foreach($sessions ?? [] as $s)
+                                <option value="{{ $s->id }}">
+                                    {{ $s->medical_record_number }}
+                                    @if($s->patient) — {{ $s->patient->nama }} @endif
+                                    ({{ $s->started_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i') }})
+                                </option>
                             @endforeach
-                        @endforelse
-                    </tbody>
-                </table>
+                        </select>
+                    </div>
+
+                    <!-- Vital Signs Checkboxes -->
+                    <div class="flex gap-3 items-center">
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600">
+                            <input type="checkbox" value="heart_rate" x-model="vitalSigns"
+                                class="rounded border-gray-300 text-[rgb(0,62,48)] focus:ring-[rgb(0,62,48)]">
+                            Heart Rate
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600">
+                            <input type="checkbox" value="spo2" x-model="vitalSigns"
+                                class="rounded border-gray-300 text-[rgb(0,62,48)] focus:ring-[rgb(0,62,48)]">
+                            SpO2
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600">
+                            <input type="checkbox" value="temperature" x-model="vitalSigns"
+                                class="rounded border-gray-300 text-[rgb(0,62,48)] focus:ring-[rgb(0,62,48)]">
+                            Suhu
+                        </label>
+                        <button @click="loadSession()" :disabled="!selectedSessionId || loading"
+                            class="px-3 py-1.5 bg-[rgb(0,62,48)] hover:bg-[rgb(0,80,60)] disabled:opacity-50 text-white text-xs rounded transition">
+                            Tampilkan
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div x-show="loading" class="flex items-center justify-center py-8">
+                <svg class="animate-spin h-6 w-6 text-[rgb(0,62,48)]" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span class="ml-2 text-sm text-gray-500">Memuat data sesi...</span>
+            </div>
+
+            <!-- Dynamic Content Area -->
+            <div x-show="!loading">
+                <!-- Identitas Pasien -->
+                <div id="laporan-patient" x-ref="patientSection">
+                    @if($session)
+                        @include('pages.nakes.partials._laporan-patient')
+                    @endif
+                </div>
+
+                <!-- Main content: chart, vitals, stats, readings -->
+                <div id="laporan-content" x-ref="contentSection" class="space-y-4">
+                    @if($session)
+                        @include('pages.nakes.partials._laporan-content')
+                    @else
+                        <!-- No session selected -->
+                        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+                            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <p class="text-gray-500 text-sm">Pilih sesi monitoring untuk menampilkan laporan.</p>
+                        </div>
+                    @endif
+                </div>
             </div>
 
         </div>
 
-        <!-- Filter & Unduh -->
-        <div class="w-52 flex-shrink-0 space-y-3 sticky top-6">
-            <p class="text-sm font-semibold text-[rgb(0,62,48)]">Rentang Tanggal</p>
-            <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-3 space-y-2">
-                <div class="flex items-center gap-1.5 text-xs text-gray-600">
-                    <svg class="w-4 h-4 text-[rgb(0,62,48)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                    <span>
-                        {{ isset($dari)   ? \Carbon\Carbon::parse($dari)->format('d/m/Y')   : '12/03/2026' }}
-                        –
-                        {{ isset($sampai) ? \Carbon\Carbon::parse($sampai)->format('d/m/Y') : '16/03/2026' }}
-                    </span>
+        <!-- Sidebar: Info & Unduh -->
+        <div class="w-52 flex-shrink-0 space-y-3 sticky top-6" id="laporan-sidebar" x-ref="sidebarSection">
+            @if($session)
+                @include('pages.nakes.partials._laporan-sidebar')
+            @else
+                <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
+                    <p class="text-xs text-gray-500 text-center italic">Pilih sesi untuk mengunduh laporan.</p>
                 </div>
-                <input type="date" id="inputDari"
-                    value="{{ $dari ?? '2026-03-12' }}"
-                    class="w-full text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-[rgb(0,62,48)]">
-                <input type="date" id="inputSampai"
-                    value="{{ $sampai ?? '2026-03-16' }}"
-                    class="w-full text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-[rgb(0,62,48)]">
-                <button onclick="filterRentang()"
-                    class="w-full py-1.5 bg-[rgb(0,62,48)] hover:bg-[rgb(0,80,60)] text-white text-xs rounded transition">
-                    Terapkan
-                </button>
-            </div>
-
-            <!-- Tombol Unduh PDF -->
-            <a href="{{ route('laporan.pdf', [
-                    'pasien_id' => $pasien?->id ?? 1,
-                    'dari'      => $dari    ?? '2026-03-12',
-                    'sampai'    => $sampai  ?? '2026-03-16',
-                ]) }}"
-               target="_blank"
-               class="flex items-center justify-center gap-2 w-full py-2.5 bg-[rgb(0,62,48)] hover:bg-[rgb(0,80,60)] text-white text-sm font-semibold rounded-lg shadow transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
-                Unduh PDF
-            </a>
+            @endif
         </div>
 
     </div>
+
+    <!-- Modal Input Data Pasien -->
+    <div x-show="showPatientModal" x-transition
+        class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-white/70 backdrop-blur-sm" @click="showPatientModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-[rgb(0,62,48)]">Input Data Pasien</h3>
+                <button @click="showPatientModal = false"
+                    class="p-1 hover:bg-gray-100 rounded-full transition cursor-pointer">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('input-data-pasien.store') }}" class="p-6 space-y-4">
+                @csrf
+                <input type="hidden" name="device_id" :value="deviceId" />
+                <input type="hidden" name="session_id" :value="selectedSessionId" />
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <span class="font-medium">Sesi:</span> <span x-text="selectedSessionLabel"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="modal_nama" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nama Lengkap <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="modal_nama" name="nama" required
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="modal_nik" class="block text-sm font-medium text-gray-700 mb-1">NIK</label>
+                        <input type="text" id="modal_nik" name="nik" maxlength="16"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label for="modal_tanggal_lahir" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                        <input type="date" id="modal_tanggal_lahir" name="tanggal_lahir"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="modal_umur" class="block text-sm font-medium text-gray-700 mb-1">
+                            Umur <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" id="modal_umur" name="umur" required min="0" max="150"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="modal_jenis_kelamin" class="block text-sm font-medium text-gray-700 mb-1">
+                            Jenis Kelamin <span class="text-red-500">*</span>
+                        </label>
+                        <select id="modal_jenis_kelamin" name="jenis_kelamin" required
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                            <option value="" disabled selected>Pilih</option>
+                            <option value="L">Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="modal_penyakit_alergi" class="block text-sm font-medium text-gray-700 mb-1">Penyakit/Alergi</label>
+                    <input type="text" id="modal_penyakit_alergi" name="penyakit_alergi"
+                        placeholder="Contoh: Diabetes, Alergi penisilin"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                </div>
+                <div>
+                    <label for="modal_catatan_tambahan" class="block text-sm font-medium text-gray-700 mb-1">Catatan Tambahan</label>
+                    <input type="text" id="modal_catatan_tambahan" name="catatan_tambahan"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" @click="showPatientModal = false"
+                        class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-6 py-2 bg-[rgb(0,62,48)] hover:bg-[rgb(0,80,60)] text-white text-sm font-medium rounded-lg transition cursor-pointer">
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </main>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-    const labels    = {!! json_encode($labelGrafik   ?? ['PM001','PM002','PM003','PM004','PM005','PM006','PM007','PM008','PM009','PM010','PM011','PM012','PM013','PM014','PM015']) !!};
-    const sistolik  = {!! json_encode($dataSistolik  ?? [130,125,135,128,140,132,138,126,134,129,137,131,136,124,133]) !!};
-    const diastolik = {!! json_encode($dataDiastolik ?? [82,78,85,80,88,83,86,79,84,81,87,82,85,78,83]) !!};
-
-    const ctx = document.getElementById('chartTekananDarah').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'Sistolik',
-                    data: sistolik,
-                    borderColor: 'rgb(220,38,38)',
-                    backgroundColor: 'rgba(220,38,38,0.05)',
-                    borderWidth: 1.5,
-                    pointRadius: 2,
-                    tension: 0.4,
-                },
-                {
-                    label: 'Diastolik',
-                    data: diastolik,
-                    borderColor: 'rgb(59,130,246)',
-                    backgroundColor: 'rgba(59,130,246,0.05)',
-                    borderWidth: 1.5,
-                    pointRadius: 2,
-                    tension: 0.4,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { ticks: { font: { size: 8 }, maxRotation: 90 } },
-                y: {
-                    ticks: { font: { size: 9 } },
-                    title: { display: true, text: 'Tekanan (mmHg)', font: { size: 9 } }
-                }
-            }
-        }
-    });
-
-    function filterRentang() {
-        const dari   = document.getElementById('inputDari').value;
-        const sampai = document.getElementById('inputSampai').value;
-        if (!dari || !sampai) return alert('Pilih tanggal mulai dan selesai.');
-        const url = new URL(window.location.href);
-        url.searchParams.set('dari', dari);
-        url.searchParams.set('sampai', sampai);
-        window.location.href = url.toString();
-    }
-</script>
 @endsection
