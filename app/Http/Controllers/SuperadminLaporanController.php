@@ -18,11 +18,20 @@ class SuperadminLaporanController extends Controller
     {
         $dari = $request->get('dari', now()->subDays(7)->toDateString());
         $sampai = $request->get('sampai', now()->toDateString());
-        $ambulans = $request->get('ambulans', '');
+        $kategori = $request->get('kategori', '');
+        $deviceId = $request->get('device_id', '');
+        $tab = $request->get('tab', 'operasional');
 
-        $data = $this->reportService->getReportData($dari, $sampai, $ambulans);
+        // Ambil data untuk kedua tab (supaya switch tanpa reload)
+        $operasionalData = $this->reportService->getOperasionalData($dari, $sampai, $deviceId ?: null);
+        $auditData = $this->reportService->getAuditData($dari, $sampai, $kategori ?: null, $deviceId ?: null);
+        $devices = $this->reportService->getAllDevices();
+        $kategoriList = $this->reportService->getKategoriList();
 
-        return view('pages.superadmin.laporan', $data);
+        return view('pages.superadmin.laporan', compact(
+            'operasionalData', 'auditData', 'devices', 'kategoriList',
+            'dari', 'sampai', 'kategori', 'deviceId', 'tab'
+        ));
     }
 
     /**
@@ -32,8 +41,10 @@ class SuperadminLaporanController extends Controller
     {
         $dari = $request->get('dari', now()->subDays(7)->toDateString());
         $sampai = $request->get('sampai', now()->toDateString());
-        $ambulans = $request->get('ambulans', '');
+        $exportType = $request->get('export_type', 'both');
+        $deviceId = $request->get('device_id', '');
+        $kategori = $request->get('kategori', '');
 
-        return $this->reportService->generatePdf($dari, $sampai, $ambulans);
+        return $this->reportService->generatePdf($dari, $sampai, $exportType, $deviceId ?: null, $kategori ?: null);
     }
 }

@@ -85,6 +85,25 @@ class ReportService
     }
 
     /**
+     * Get all completed sessions assigned to a dokter (for Rekam Medis).
+     */
+    public function getRekamMedisList(int $dokterId): Collection
+    {
+        return MonitoringSession::where('dokter_id', $dokterId)
+            ->where('status', 'completed')
+            ->with(['patient', 'creator', 'device'])
+            ->orderByDesc('ended_at')
+            ->get()
+            ->map(function ($session) {
+                $stats = $this->getSessionStats($session->id);
+                return [
+                    'session' => $session,
+                    'stats' => $stats,
+                ];
+            });
+    }
+
+    /**
      * Get session summary for laporan list.
      */
     public function getSessionSummaries(string $deviceId): Collection

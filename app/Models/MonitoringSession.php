@@ -14,6 +14,7 @@ class MonitoringSession extends Model
         'patient_id',
         'medical_record_number',
         'created_by',
+        'dokter_id',
         'started_at',
         'ended_at',
         'status',
@@ -40,6 +41,11 @@ class MonitoringSession extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function dokter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dokter_id');
     }
 
     public function sensorReadings(): HasMany

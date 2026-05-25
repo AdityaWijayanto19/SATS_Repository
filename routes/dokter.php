@@ -8,6 +8,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\RekamMedisController;
 
 // Dashboard & Device Selection
 Route::get('/dashboard', [DashboardController::class, 'viewDashboardPage'])->name('dokter.dashboard');
@@ -20,6 +21,11 @@ Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasi
 // Laporan
 Route::get('/laporan', [LaporanController::class, 'index'])->name('dokter.laporan');
 Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('dokter.laporan.pdf');
+
+// Rekam Medis
+Route::get('/rekam-medis', [RekamMedisController::class, 'index'])->name('dokter.rekam-medis');
+Route::get('/rekam-medis/{id}', [RekamMedisController::class, 'show'])->name('dokter.rekam-medis.show');
+Route::get('/rekam-medis/{id}/pdf', [RekamMedisController::class, 'pdf'])->name('dokter.rekam-medis.pdf');
 
 // Instruksi
 Route::get('/instruksi', function () {

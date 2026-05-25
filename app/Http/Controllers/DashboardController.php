@@ -6,6 +6,7 @@ use App\Http\Requests\SaveDeviceConfigRequest;
 use App\Http\Requests\SelectDeviceRequest;
 use App\Http\Requests\ToggleDeviceStatusRequest;
 use App\Models\NakesDeviceConfig;
+use App\Models\User;
 use App\Services\DashboardService;
 use Illuminate\Support\Facades\Auth;
 
@@ -48,8 +49,9 @@ class DashboardController extends Controller
     public function viewInputDataPasienPage()
     {
         $devices = $this->dashboardService->getDevicesWithActiveSession();
+        $dokters = User::where('role', 'dokter')->select('id', 'name')->get();
 
-        return view($this->getViewByRole('inputdata'), compact('devices'));
+        return view($this->getViewByRole('inputdata'), compact('devices', 'dokters'));
     }
 
     // Menampilkan halaman laporan

@@ -171,22 +171,46 @@
                     @enderror
                 </div>
 
-                <!-- Catatan Tambahan -->
-                <div>
-                    <label for="catatan_tambahan" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
-                        Catatan Tambahan
-                    </label>
-                    <input
-                        type="text"
-                        id="catatan_tambahan"
-                        name="catatan_tambahan"
-                        value="{{ old('catatan_tambahan') }}"
-                        placeholder="Catatan lain yang perlu diketahui"
-                        class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition"
-                    />
-                    @error('catatan_tambahan')
-                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                    @enderror
+                <!-- Catatan Tambahan & Dokter -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label for="catatan_tambahan" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
+                            Catatan Tambahan
+                        </label>
+                        <input
+                            type="text"
+                            id="catatan_tambahan"
+                            name="catatan_tambahan"
+                            value="{{ old('catatan_tambahan') }}"
+                            placeholder="Catatan lain yang perlu diketahui"
+                            class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition"
+                        />
+                        @error('catatan_tambahan')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="dokter_id" class="block text-sm font-medium text-[rgb(0,62,48)] mb-1">
+                            Dokter yang Bertugas <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="dokter_id"
+                            name="dokter_id"
+                            required
+                            class="w-full px-3 py-2 bg-[rgba(0,100,70,0.07)] border border-[rgba(0,62,48,0.2)] rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[rgb(0,62,48)] focus:border-transparent transition appearance-none cursor-pointer"
+                        >
+                            <option value="" disabled {{ old('dokter_id') ? '' : 'selected' }}>Pilih dokter</option>
+                            @foreach($dokters as $dokter)
+                                <option value="{{ $dokter->id }}" {{ old('dokter_id') == $dokter->id ? 'selected' : '' }}>
+                                    {{ $dokter->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('dokter_id')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
 
                 <!-- Tombol Submit -->

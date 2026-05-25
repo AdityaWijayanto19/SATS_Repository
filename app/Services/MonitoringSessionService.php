@@ -127,7 +127,7 @@ class MonitoringSessionService
     /**
      * Link patient data to a session.
      */
-    public function linkPatient(int $sessionId, array $patientData): MonitoringSession
+    public function linkPatient(int $sessionId, array $patientData, ?int $dokterId = null): MonitoringSession
     {
         $session = MonitoringSession::findOrFail($sessionId);
 
@@ -144,6 +144,11 @@ class MonitoringSessionService
 
             $patient = Patient::create($patientData);
             $session->update(['patient_id' => $patient->id]);
+        }
+
+        // Assign dokter ke session
+        if ($dokterId) {
+            $session->update(['dokter_id' => $dokterId]);
         }
 
         Log::info("Patient linked to session: {$session->medical_record_number}");

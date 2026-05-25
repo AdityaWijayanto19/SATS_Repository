@@ -38,6 +38,8 @@ class ActivityLog extends Model
         'device.deleted' => 'red',
         'monitoring.started' => 'violet',
         'monitoring.stopped' => 'violet',
+        'monitoring.completed' => 'emerald',
+        'patient.registered' => 'teal',
         'patient.warning' => 'amber',
         'patient.critical' => 'red',
         'instruction.sent' => 'indigo',

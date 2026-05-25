@@ -29,6 +29,7 @@ class PatientController extends Controller
             'umur' => 'required|integer|min:0|max:150',
             'penyakit_alergi' => 'nullable|string|max:500',
             'catatan_tambahan' => 'nullable|string|max:1000',
+            'dokter_id' => 'nullable|integer|exists:users,id',
         ]);
 
         // Find session: use provided session_id or find active session
@@ -45,8 +46,10 @@ class PatientController extends Controller
             ])->withInput();
         }
 
-        // Link patient to session
-        $session = $this->sessionService->linkPatient($session->id, $validated);
+        // Link patient to session (dengan assign dokter)
+        $dokterId = $validated['dokter_id'] ?? null;
+        unset($validated['dokter_id']);
+        $session = $this->sessionService->linkPatient($session->id, $validated, $dokterId);
 
         ActivityLog::log(
             'patient.registered',
