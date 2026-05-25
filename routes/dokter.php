@@ -26,6 +26,7 @@ Route::get('/laporan/pdf', [LaporanController::class, 'pdf'])->name('dokter.lapo
 Route::get('/rekam-medis', [RekamMedisController::class, 'index'])->name('dokter.rekam-medis');
 Route::get('/rekam-medis/{id}', [RekamMedisController::class, 'show'])->name('dokter.rekam-medis.show');
 Route::get('/rekam-medis/{id}/pdf', [RekamMedisController::class, 'pdf'])->name('dokter.rekam-medis.pdf');
+Route::get('/rekam-medis/{id}/count-readings', [RekamMedisController::class, 'countReadings'])->name('dokter.rekam-medis.count-readings');
 
 // Instruksi
 Route::get('/instruksi', function () {

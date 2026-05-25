@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\MonitoringSession;
 use App\Services\ReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class RekamMedisController extends Controller
@@ -50,7 +52,7 @@ class RekamMedisController extends Controller
     /**
      * Generate & stream PDF rekam medis.
      */
-    public function pdf($id)
+    public function pdf($id, Request $request)
     {
         $user = Auth::user();
 
@@ -60,21 +62,75 @@ class RekamMedisController extends Controller
             ->with(['patient', 'creator', 'device'])
             ->firstOrFail();
 
+        // Filter rentang waktu (konversi Asia/Jakarta → UTC untuk query DB)
+        $dari = $request->get('dari');
+        $sampai = $request->get('sampai');
+
+        $startTime = null;
+        $endTime = null;
+
+        if ($dari && $session->started_at) {
+            $startTime = Carbon::createFromFormat('Y-m-d H:i', $session->started_at->toDateString() . ' ' . $dari, 'Asia/Jakarta')->setTimezone('UTC');
+        }
+        if ($sampai && $session->started_at) {
+            $endTime = Carbon::createFromFormat('Y-m-d H:i', $session->started_at->toDateString() . ' ' . $sampai, 'Asia/Jakarta')->setTimezone('UTC');
+        }
+
         $vitalSigns = ['heart_rate', 'spo2', 'temperature'];
-        $chartData = $this->reportService->getHistoryForChart($session->id, $vitalSigns);
+        $chartData = $this->reportService->getHistoryForChart($session->id, $vitalSigns, $startTime, $endTime);
         $latestReading = $this->reportService->getLatestReading($session->id);
-        $stats = $this->reportService->getSessionStats($session->id);
+        $stats = $this->reportService->getSessionStats($session->id, $startTime, $endTime);
+
+        // Load sensor readings dengan filter waktu untuk tabel
+        $session->load(['sensorReadings' => function ($q) use ($startTime, $endTime) {
+            if ($startTime) {
+                $q->where('recorded_at', '>=', $startTime);
+            }
+            if ($endTime) {
+                $q->where('recorded_at', '<=', $endTime);
+            }
+            $q->orderBy('recorded_at', 'asc')->limit(100);
+        }]);
 
         // Generate chart via QuickChart.io
         $grafikBase64 = $this->generateChartBase64($chartData, $vitalSigns);
 
         $pdf = Pdf::loadView('pages.dokter.rekam-medis-pdf', compact(
-            'session', 'chartData', 'latestReading', 'stats', 'grafikBase64', 'vitalSigns'
+            'session', 'chartData', 'latestReading', 'stats', 'grafikBase64', 'vitalSigns', 'dari', 'sampai'
         ))->setPaper('a4', 'portrait');
 
         $namaFile = 'RekamMedis_' . ($session->medical_record_number ?? 'Unknown') . '_' . now()->format('Ymd') . '.pdf';
 
         return $pdf->stream($namaFile);
+    }
+
+    /**
+     * Hitung jumlah readings dalam rentang waktu (AJAX).
+     */
+    public function countReadings($id, Request $request)
+    {
+        $user = Auth::user();
+
+        $session = MonitoringSession::where('id', $id)
+            ->where('dokter_id', $user->id)
+            ->where('status', 'completed')
+            ->firstOrFail();
+
+        $dari = $request->get('dari');
+        $sampai = $request->get('sampai');
+
+        $query = \App\Models\SensorReading::where('session_id', $session->id);
+
+        if ($dari && $session->started_at) {
+            $startTime = Carbon::createFromFormat('Y-m-d H:i', $session->started_at->toDateString() . ' ' . $dari, 'Asia/Jakarta')->setTimezone('UTC');
+            $query->where('recorded_at', '>=', $startTime);
+        }
+        if ($sampai && $session->started_at) {
+            $endTime = Carbon::createFromFormat('Y-m-d H:i', $session->started_at->toDateString() . ' ' . $sampai, 'Asia/Jakarta')->setTimezone('UTC');
+            $query->where('recorded_at', '<=', $endTime);
+        }
+
+        return response()->json(['count' => $query->count()]);
     }
 
     /**

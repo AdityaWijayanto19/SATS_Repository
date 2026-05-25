@@ -175,10 +175,39 @@
             </div>
 
             <!-- Sidebar Kanan -->
-            <div class="w-52 flex-shrink-0">
+            <div class="w-56 flex-shrink-0" x-data="{
+                dari: '{{ $session->started_at?->setTimezone('Asia/Jakarta')->format('H:i') }}',
+                sampai: '{{ $session->ended_at?->setTimezone('Asia/Jakarta')->format('H:i') ?? now()->setTimezone('Asia/Jakarta')->format('H:i') }}',
+                count: {{ $stats['total_readings'] }},
+                loading: false,
+                debounce: null,
+                fetchCount() {
+                    clearTimeout(this.debounce);
+                    this.debounce = setTimeout(() => {
+                        this.loading = true;
+                        fetch('{{ route('dokter.rekam-medis.count-readings', $session->id) }}' + '?dari=' + this.dari + '&sampai=' + this.sampai)
+                            .then(r => r.json())
+                            .then(data => { this.count = data.count; this.loading = false; })
+                            .catch(() => { this.loading = false; });
+                    }, 500);
+                }
+            }">
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sticky top-6 space-y-3">
-                    <h3 class="text-sm font-semibold text-[rgb(0,62,48)]">Aksi</h3>
-                    <a href="{{ route('dokter.rekam-medis.pdf', $session->id) }}"
+                    <h3 class="text-sm font-semibold text-[rgb(0,62,48)]">Unduh PDF</h3>
+
+                    {{-- Rentang Waktu --}}
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Dari Jam</label>
+                        <input type="time" x-model="dari" @change="fetchCount()"
+                            class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Sampai Jam</label>
+                        <input type="time" x-model="sampai" @change="fetchCount()"
+                            class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(0,83,63,0.3)] focus:border-[rgb(0,83,63)] transition-all">
+                    </div>
+
+                    <a :href="'{{ route('dokter.rekam-medis.pdf', $session->id) }}' + '?dari=' + dari + '&sampai=' + sampai"
                        class="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[rgb(0,62,48)] hover:bg-[rgb(0,80,60)] text-white text-sm font-medium rounded-md transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -188,7 +217,7 @@
 
                     <div class="border-t border-gray-100 pt-3 text-xs text-gray-500 space-y-1">
                         <p><span class="font-medium text-gray-700">RM:</span> {{ $session->medical_record_number }}</p>
-                        <p><span class="font-medium text-gray-700">Data:</span> {{ $stats['total_readings'] }} readings</p>
+                        <p><span class="font-medium text-gray-700">Data:</span> <span x-text="loading ? '...' : count + ' readings'"></span></p>
                     </div>
                 </div>
             </div>

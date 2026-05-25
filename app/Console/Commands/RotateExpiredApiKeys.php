@@ -24,15 +24,13 @@ class RotateExpiredApiKeys extends Command
     {
         $this->info('Memulai rotasi API key...');
 
-        // ---------------------------------------------------------------
-        // Block 1: Key yang akan expired dalam 30 hari (MASA TENGGANG)
+        // Block 1 -> Key yang akan expired dalam 30 hari (MASA TENGGANG)
         //
-        // PENTING: Key ini tetap AKTIF sampai tanggal expires_at tercapai.
+        // Key ini tetap aktif sampai tanggal expires_at tercapai.
         // Kita hanya catat peringatan sebagai audit trail supaya admin
         // bisa merencanakan rotasi key secara proaktif.
         // Kita TIDAK menonaktifkan (is_active = false) di sini karena
         // bisa langsung memutus koneksi ambulans yang sedang di jalan.
-        // ---------------------------------------------------------------
         $expiringKeys = ApiKey::query()
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now()->addDays(30))
@@ -69,14 +67,12 @@ class RotateExpiredApiKeys extends Command
             }
         }
 
-        // ---------------------------------------------------------------
-        // Block 2: Key yang SUDAH expired (expires_at <= sekarang)
+        // Block 2 -> Key yang sudah expired (expires_at <= sekarang)
         //
         // Key ini aman untuk dinonaktifkan karena waktu expired-nya
         // sudah terlewati, artinya perangkat seharusnya sudah di-rotasi.
         // Kita catat log emergency karena perangkat mungkin sudah
         // kehilangan koneksi.
-        // ---------------------------------------------------------------
         $expiredKeys = ApiKey::query()
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())

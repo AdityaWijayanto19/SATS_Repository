@@ -10,7 +10,7 @@
         default    => ['bg-orange-400', 'bg-orange-100 text-orange-700', 'Perhatian', 'bg-[rgba(0,62,48,0.05)] border-[rgba(0,62,48,0.18)]'],
     };
 @endphp
-<div class="flex items-center gap-4 {{ $riskBannerBg }} border rounded-xl px-5 py-3.5">
+<div class="flex items-center gap-4 mt-4 {{ $riskBannerBg }} border rounded-xl px-5 py-3.5">
     <span class="w-2 h-2 rounded-full {{ $riskDot }} flex-shrink-0"></span>
     <div class="flex-1">
         <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>

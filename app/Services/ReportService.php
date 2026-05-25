@@ -33,10 +33,12 @@ class ReportService
     /**
      * Get history data formatted for Chart.js.
      */
-    public function getHistoryForChart(int $sessionId, array $vitalSigns = ['heart_rate', 'spo2', 'temperature']): array
+    public function getHistoryForChart(int $sessionId, array $vitalSigns = ['heart_rate', 'spo2', 'temperature'], $startTime = null, $endTime = null): array
     {
         $readings = SensorReading::where('session_id', $sessionId)
             ->select(array_merge(['recorded_at'], $vitalSigns))
+            ->when($startTime, fn($q) => $q->where('recorded_at', '>=', $startTime))
+            ->when($endTime, fn($q) => $q->where('recorded_at', '<=', $endTime))
             ->orderBy('recorded_at', 'asc')
             ->get();
 
@@ -63,9 +65,11 @@ class ReportService
     /**
      * Get statistics for a session.
      */
-    public function getSessionStats(int $sessionId): array
+    public function getSessionStats(int $sessionId, $startTime = null, $endTime = null): array
     {
-        $readings = SensorReading::where('session_id', $sessionId);
+        $readings = SensorReading::where('session_id', $sessionId)
+            ->when($startTime, fn($q) => $q->where('recorded_at', '>=', $startTime))
+            ->when($endTime, fn($q) => $q->where('recorded_at', '<=', $endTime));
 
         return [
             'total_readings' => (clone $readings)->count(),

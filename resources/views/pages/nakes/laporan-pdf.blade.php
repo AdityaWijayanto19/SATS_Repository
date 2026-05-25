@@ -16,18 +16,17 @@
 
         /* Header */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             border-bottom: 2px solid rgb(0,62,48);
             padding-bottom: 10px;
             margin-bottom: 16px;
         }
-        .header-brand { display: flex; align-items: center; gap: 10px; }
-        .header-brand img { width: 44px; height: 44px; object-fit: contain; }
+        .header-brand { display: table-cell; vertical-align: middle; }
+        .header-brand img { display: inline-block; vertical-align: middle; margin-right: 10px; width: 44px; height: 44px; }
         .header-brand .brand-text .name    { font-size: 14px; font-weight: bold; color: rgb(0,62,48); }
         .header-brand .brand-text .tagline { font-size: 9px; color: #555; margin-top: 1px; }
-        .header-right { text-align: right; font-size: 10px; color: #555; }
+        .header-right { display: table-cell; vertical-align: middle; text-align: right; font-size: 10px; color: #555; }
         .header-right .doc-title { font-size: 15px; font-weight: bold; color: rgb(0,62,48); }
 
         /* Section Card */
@@ -49,16 +48,16 @@
         .section-card-body { padding: 10px 12px; }
 
         /* Identitas Pasien */
-        .identitas-grid { display: flex; gap: 24px; }
-        .identitas-col { flex: 1; }
+        .identitas-grid { display: table; width: 100%; }
+        .identitas-col { display: table-cell; width: 50%; vertical-align: top; padding-right: 12px; }
+        .identitas-col:last-child { padding-right: 0; padding-left: 12px; }
         .identitas-row { margin-bottom: 3px; font-size: 10.5px; }
         .identitas-row .label { font-weight: bold; color: #333; }
 
         /* Banner Prediksi ML */
         .ml-banner {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
+            display: table;
+            width: 100%;
             border-radius: 8px;
             padding: 10px 14px;
             margin-bottom: 12px;
@@ -67,22 +66,24 @@
         .ml-banner.warning  { background: #fffbeb; border-color: #fcd34d; }
         .ml-banner.critical { background: #fff1f1; border-color: #fca5a5; }
         .ml-banner.normal   { background: #f0fdf4; border-color: #86efac; }
-        .ml-banner-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
-        .ml-banner-dot.warning  { background: #f59e0b; }
-        .ml-banner-dot.critical { background: #ef4444; }
-        .ml-banner-dot.normal   { background: #22c55e; }
-        .ml-banner-content { flex: 1; }
+        .ml-banner-dot { display: table-cell; width: 8px; vertical-align: top; padding-top: 3px; }
+        .ml-banner-dot-inner { width: 8px; height: 8px; border-radius: 50%; }
+        .ml-banner-dot-inner.warning  { background: #f59e0b; }
+        .ml-banner-dot-inner.critical { background: #ef4444; }
+        .ml-banner-dot-inner.normal   { background: #22c55e; }
+        .ml-banner-content { display: table-cell; vertical-align: top; padding: 0 10px; }
         .ml-banner-label { font-size: 8.5px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .ml-banner-text  { font-size: 10.5px; color: rgb(0,62,48); font-weight: 500; }
-        .ml-banner-badge { font-size: 9px; font-weight: bold; padding: 2px 10px; border-radius: 999px; flex-shrink: 0; }
+        .ml-banner-badge-cell { display: table-cell; vertical-align: middle; text-align: right; }
+        .ml-banner-badge { font-size: 9px; font-weight: bold; padding: 2px 10px; border-radius: 999px; }
         .ml-banner-badge.warning  { background: #fef3c7; color: #92400e; }
         .ml-banner-badge.critical { background: #fee2e2; color: #b91c1c; }
         .ml-banner-badge.normal   { background: #dcfce7; color: #15803d; }
 
         /* Dua Kolom: grafik + vital/stats */
-        .row-cols { display: flex; gap: 12px; margin-bottom: 12px; }
-        .col-chart { flex: 3; }
-        .col-side  { flex: 2; display: flex; flex-direction: column; gap: 10px; }
+        .row-cols { display: table; width: 100%; border-spacing: 12px; margin: -12px -12px 0; }
+        .col-chart { display: table-cell; width: 60%; vertical-align: top; }
+        .col-side  { display: table-cell; width: 40%; vertical-align: top; }
 
         /* Nilai Vital */
         .vital-box {
@@ -92,16 +93,17 @@
             text-align: center;
         }
         .vital-title { font-size: 11px; font-weight: bold; color: rgb(0,62,48); margin-bottom: 8px; }
-        .vital-values { display: flex; justify-content: space-around; align-items: center; }
+        .vital-values { width: 100%; }
+        .vital-item { display: inline-block; width: 31%; text-align: center; vertical-align: middle; }
         .vital-item .label { font-size: 9px; color: #666; margin-bottom: 2px; }
         .vital-item .value { font-size: 26px; font-weight: 900; color: #111; line-height: 1; }
         .vital-item .unit  { font-size: 9px; color: #888; margin-top: 2px; }
-        .vital-divider { width: 1px; height: 36px; background: #e5e7eb; }
+        .vital-divider { display: inline-block; width: 1px; height: 40px; background: #e5e7eb; vertical-align: middle; }
 
         /* Statistik */
-        .stats-box { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; }
+        .stats-box { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
         .stats-title { font-size: 11px; font-weight: bold; color: rgb(0,62,48); margin-bottom: 6px; }
-        .stats-row { display: flex; justify-content: space-between; font-size: 10px; color: #555; margin-bottom: 3px; }
+        .stats-row { font-size: 10px; color: #555; margin-bottom: 3px; }
         .stats-row .val { font-weight: 600; color: #111; }
         .stats-divider { border-top: 1px solid #e5e7eb; margin: 4px 0; }
 
@@ -113,12 +115,11 @@
             height: 200px;
         }
         .chart-title { font-size: 10px; font-weight: bold; color: #555; text-align: center; margin-bottom: 6px; }
-        .chart-img   { width: 100%; height: 170px; object-fit: contain; }
+        .chart-img   { width: 100%; max-height: 170px; }
         .chart-empty {
-            height: 170px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 80px;
+            line-height: 80px;
+            text-align: center;
             background: #f9fafb;
             border-radius: 4px;
             color: #aaa;
@@ -160,11 +161,12 @@
             margin-top: 20px;
             padding-top: 10px;
             border-top: 1px solid #e5e7eb;
-            display: flex;
-            justify-content: space-between;
+            display: table;
+            width: 100%;
             font-size: 9px;
             color: #888;
         }
+        .footer span { display: table-cell; }
     </style>
 </head>
 <body>
@@ -226,12 +228,12 @@
         };
     @endphp
     <div class="ml-banner {{ $riskLevel }}">
-        <div class="ml-banner-dot {{ $riskLevel }}"></div>
+        <div class="ml-banner-dot"><div class="ml-banner-dot-inner {{ $riskLevel }}"></div></div>
         <div class="ml-banner-content">
             <div class="ml-banner-label">Prediksi ML</div>
             <div class="ml-banner-text">{{ $riskPesan }}</div>
         </div>
-        <span class="ml-banner-badge {{ $riskLevel }}">{{ $riskBadgeLabel }}</span>
+        <div class="ml-banner-badge-cell"><span class="ml-banner-badge {{ $riskLevel }}">{{ $riskBadgeLabel }}</span></div>
     </div>
 
     <!-- Grafik & Nilai Vital -->
@@ -281,18 +283,18 @@
             @if($stats)
                 <div class="stats-box">
                     <div class="stats-title">Statistik Sesi</div>
-                    <div class="stats-row"><span>Total Pembacaan</span><span class="val">{{ $stats['total_readings'] }}</span></div>
-                    <div class="stats-row"><span>Rata-rata HR</span><span class="val">{{ $stats['avg_heart_rate'] }} bpm</span></div>
-                    <div class="stats-row"><span>Rata-rata SpO2</span><span class="val">{{ $stats['avg_spo2'] }}%</span></div>
-                    <div class="stats-row"><span>Rata-rata Suhu</span><span class="val">{{ $stats['avg_temperature'] }}°C</span></div>
+                    <div class="stats-row">Total Pembacaan : <span class="val">{{ $stats['total_readings'] }}</span></div>
+                    <div class="stats-row">Rata-rata HR : <span class="val">{{ $stats['avg_heart_rate'] }} bpm</span></div>
+                    <div class="stats-row">Rata-rata SpO2 : <span class="val">{{ $stats['avg_spo2'] }}%</span></div>
+                    <div class="stats-row">Rata-rata Suhu : <span class="val">{{ $stats['avg_temperature'] }}°C</span></div>
                     <div class="stats-divider"></div>
-                    <div class="stats-row"><span>Min–Max HR</span><span class="val">{{ $stats['min_heart_rate'] }}–{{ $stats['max_heart_rate'] }} bpm</span></div>
-                    <div class="stats-row"><span>Min–Max SpO2</span><span class="val">{{ $stats['min_spo2'] }}–{{ $stats['max_spo2'] }}%</span></div>
-                    <div class="stats-row"><span>Min–Max Suhu</span><span class="val">{{ $stats['min_temperature'] }}–{{ $stats['max_temperature'] }}°C</span></div>
+                    <div class="stats-row">Min–Max HR : <span class="val">{{ $stats['min_heart_rate'] }}–{{ $stats['max_heart_rate'] }} bpm</span></div>
+                    <div class="stats-row">Min–Max SpO2 : <span class="val">{{ $stats['min_spo2'] }}–{{ $stats['max_spo2'] }}%</span></div>
+                    <div class="stats-row">Min–Max Suhu : <span class="val">{{ $stats['min_temperature'] }}–{{ $stats['max_temperature'] }}°C</span></div>
                     <div class="stats-divider"></div>
-                    <div class="stats-row"><span><span class="dot green"></span> Normal</span><span class="val">{{ $stats['normal_count'] }}</span></div>
-                    <div class="stats-row"><span><span class="dot yellow"></span> Warning</span><span class="val">{{ $stats['warning_count'] }}</span></div>
-                    <div class="stats-row"><span><span class="dot red"></span> Kritis</span><span class="val">{{ $stats['critical_count'] }}</span></div>
+                    <div class="stats-row">Normal : <span class="val">{{ $stats['normal_count'] }}</span></div>
+                    <div class="stats-row">Warning : <span class="val">{{ $stats['warning_count'] }}</span></div>
+                    <div class="stats-row">Kritis : <span class="val">{{ $stats['critical_count'] }}</span></div>
                 </div>
             @endif
 

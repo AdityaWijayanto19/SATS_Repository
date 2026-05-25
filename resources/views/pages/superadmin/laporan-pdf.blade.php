@@ -16,18 +16,18 @@
 
         /* Header */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: table;
+            width: 100%;
             border-bottom: 2px solid rgb(0,62,48);
             padding-bottom: 10px;
             margin-bottom: 14px;
         }
-        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .header-brand { display: table-cell; vertical-align: middle; }
+        .header-brand img { display: inline-block; vertical-align: middle; margin-right: 10px; }
         .header-brand img { width: 40px; height: 40px; object-fit: contain; }
         .header-brand .brand-text .name    { font-size: 13px; font-weight: bold; color: rgb(0,62,48); }
         .header-brand .brand-text .tagline { font-size: 8px; color: #555; margin-top: 1px; }
-        .header-right { text-align: right; font-size: 9px; color: #555; }
+        .header-right { display: table-cell; vertical-align: middle; text-align: right; font-size: 9px; color: #555; }
         .header-right .doc-title { font-size: 14px; font-weight: bold; color: rgb(0,62,48); }
 
         /* Section Divider */
@@ -55,16 +55,19 @@
 
         /* Stats */
         .stats-row {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 14px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-spacing: 10px;
+            margin: 0 -10px 14px;
         }
         .stat-box {
-            flex: 1;
+            display: table-cell;
             border: 1px solid #d1d5db;
             border-radius: 8px;
             padding: 10px 12px;
             text-align: center;
+            vertical-align: top;
         }
         .stat-value { font-size: 22px; font-weight: 900; line-height: 1; }
         .stat-label { font-size: 9px; color: #666; margin-top: 3px; }
@@ -83,12 +86,11 @@
             text-align: center;
         }
         .chart-title { font-size: 10px; font-weight: bold; color: #555; margin-bottom: 6px; }
-        .chart-img { width: 100%; height: 180px; object-fit: contain; }
+        .chart-img { width: 100%; max-height: 180px; }
         .chart-empty {
-            height: 180px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 80px;
+            line-height: 80px;
+            text-align: center;
             background: #f9fafb;
             border-radius: 4px;
             color: #aaa;
@@ -138,11 +140,12 @@
             margin-top: 16px;
             padding-top: 8px;
             border-top: 1px solid #e5e7eb;
-            display: flex;
-            justify-content: space-between;
+            display: table;
+            width: 100%;
             font-size: 8px;
             color: #888;
         }
+        .footer span { display: table-cell; }
     </style>
 </head>
 <body>
