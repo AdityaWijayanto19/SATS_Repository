@@ -2,106 +2,49 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ActivityLog;
-use App\Models\ApiKey;
-use App\Models\Devices;
-use Carbon\Carbon;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Str;
+use App\Http\Requests\RegisterDeviceManajemenRequest;
+use App\Services\DeviceManagementService;
 
 class ManajemenAlatController extends Controller
 {
+    public function __construct(
+        private DeviceManagementService $deviceManagementService
+    ) {}
+
     public function index()
     {
-        $devices = Devices::with(['systemStatus', 'apiKeys:id,device_id,name,is_active', 'sensorData' => function ($q) {
-            $q->latest('created_at')->limit(1);
-        }])->get()->map(function ($device) {
-            $latestSensor = $device->sensorData->first();
-            return [
-                'id' => $device->device_id,
-                'nama' => $device->apiKeys->first()?->name ?? $device->device_id,
-                'status' => $device->status,
-                'urgensi' => $latestSensor?->status ?? 'normal',
-                'terdaftar' => $device->created_at ? Carbon::parse($device->created_at)->format('d M Y') : '-',
-                'terakhirAktif' => $device->last_seen ? Carbon::parse($device->last_seen)->format('d M Y, H:i') : '-',
-                'keterangan' => $device->systemStatus?->monitoring_status ?? 'Tidak diketahui',
-                'battery' => $device->systemStatus?->battery_level,
-                'signal' => $device->systemStatus?->signal_strength,
-            ];
-        });
+        $devices = $this->deviceManagementService->getAllDevices();
 
         return view('pages.superadmin.manajemen-alat', compact('devices'));
     }
 
-    public function store(Request $request)
+    public function store(RegisterDeviceManajemenRequest $request)
     {
-        $request->validate([
-            'device_id' => 'required|string|max:50|unique:devices,device_id',
-            'nama' => 'required|string|max:255',
-        ]);
-
-        // Create device
-        $device = Devices::create([
-            'device_id' => $request->device_id,
-            'status' => 'offline',
-        ]);
-
-        // Generate API key (plain text shown once)
-        $plainKey = 'sats_' . Str::random(8);
-
-        ApiKey::create([
-            'device_id' => $device->device_id,
-            'key_hash' => ApiKey::hashKey($plainKey),
-            'name' => $request->nama,
-            'is_active' => true,
-        ]);
-
-        $user = Auth::user();
-        ActivityLog::log('device.added', "Admin {$user->name} menambahkan alat baru", $user->name, $user->role, $device->device_id);
+        $data = $this->deviceManagementService->registerDevice(
+            $request->validated('device_id'),
+            $request->validated('nama')
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'Perangkat berhasil didaftarkan',
-            'data' => [
-                'device_id' => $device->device_id,
-                'nama' => $request->nama,
-                'api_key' => $plainKey,
-            ],
+            'data' => $data,
         ], 201);
     }
 
     public function show($deviceId)
     {
-        $device = Devices::with(['systemStatus', 'apiKeys:id,device_id,name,is_active,last_used'])
-            ->where('device_id', $deviceId)
-            ->firstOrFail();
-
-        $latestSensor = $device->sensorData()->latest('created_at')->first();
+        $data = $this->deviceManagementService->getDeviceDetail($deviceId);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'device_id' => $device->device_id,
-                'nama' => $device->apiKeys->first()?->name ?? $device->device_id,
-                'status' => $device->status,
-                'urgensi' => $latestSensor?->status ?? 'normal',
-                'terdaftar' => $device->created_at ? Carbon::parse($device->created_at)->format('d M Y') : '-',
-                'terakhirAktif' => $device->last_seen ? Carbon::parse($device->last_seen)->format('d M Y, H:i') : '-',
-                'battery' => $device->systemStatus?->battery_level,
-                'signal' => $device->systemStatus?->signal_strength,
-            ],
+            'data' => $data,
         ]);
     }
 
     public function destroy($deviceId)
     {
-        $device = Devices::where('device_id', $deviceId)->firstOrFail();
-        $device->delete();
-
-        $user = Auth::user();
-        ActivityLog::log('device.deleted', "Admin {$user->name} menghapus alat", $user->name, $user->role, $deviceId);
+        $this->deviceManagementService->deleteDevice($deviceId);
 
         return response()->json([
             'success' => true,

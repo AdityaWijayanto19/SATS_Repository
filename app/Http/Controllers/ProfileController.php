@@ -2,49 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\UpdateProfileRequest;
+use App\Services\ProfileService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 
 class ProfileController extends Controller
 {
+    public function __construct(
+        private ProfileService $profileService
+    ) {}
+
     public function edit()
     {
-        $user = Auth::user();
-        $avatars = $this->getAvatarsForRole($user->role);
+        $data = $this->profileService->getProfileData(Auth::user());
 
-        return view('pages.profile.edit', compact('user', 'avatars'));
+        return view('pages.profile.edit', $data);
     }
 
-    public function update(Request $request)
+    public function update(UpdateProfileRequest $request)
     {
-        $user = Auth::user();
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => ['nullable', 'confirmed', Password::min(8)],
-            'photo' => 'nullable|string|max:500',
-        ]);
-
-        // Only update password if provided
-        if (empty($validated['password'])) {
-            unset($validated['password']);
-        }
-
-        $user->update($validated);
+        $this->profileService->updateProfile(Auth::user(), $request->validated());
 
         return redirect()->route('profile.edit')->with('success', 'Profil berhasil diperbarui.');
-    }
-
-    private function getAvatarsForRole(string $role): array
-    {
-        return [
-            "assets/photo_profile/{$role}_1.png",
-            "assets/photo_profile/{$role}_2.png",
-            "assets/photo_profile/{$role}_3.png",
-            "assets/photo_profile/{$role}_4.png",
-        ];
     }
 }
