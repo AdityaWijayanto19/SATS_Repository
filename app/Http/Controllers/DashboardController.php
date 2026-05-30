@@ -42,7 +42,26 @@ class DashboardController extends Controller
     // Menampilkan halaman manajemen user (superadmin)
     public function viewManajemenUserPage()
     {
-        return view($this->getViewByRole('manajemen-user'));
+        $users = User::select('id', 'name', 'email', 'role', 'created_at')
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'nama' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'role_label' => match ($user->role) {
+                        'superadmin' => 'Super Admin',
+                        'dokter' => 'Dokter',
+                        'nakes' => 'Perawat',
+                        default => $user->role,
+                    },
+                    'bergabung' => $user->created_at->format('d M Y'),
+                ];
+            });
+
+        return view($this->getViewByRole('manajemen-user'), compact('users'));
     }
 
     // Menampilkan halaman input data pasien

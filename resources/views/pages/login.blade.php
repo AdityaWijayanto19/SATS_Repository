@@ -1,7 +1,7 @@
 @extends('layouts.auth')
 
 @section('content')
-    <div class="pt-3 flex items-center justify-center bg-[rgb(251, 242, 238)]">
+    <div class="pt-3 flex items-center justify-center bg-[rgb(251, 242, 238)]" x-data="reportModal()">
         <div class="flex w-full max-w-5xl min-h-50 rounded-2xl overflow-hidden shadow-sm border border-gray-100">
 
             {{-- Kiri: Image Slider --}}
@@ -94,16 +94,270 @@
 
                 <p class="text-center text-sm text-gray-500 mt-6">
                     Belum punya akun?
-                    <a class="text-[#00a884] hover:cursor-pointer hover:underline">Hubungi superadmin</a>
+                    <a @click="showModal = true" class="text-[#00a884] hover:cursor-pointer hover:underline">Hubungi superadmin</a>
                 </p>
+            </div>
+        </div>
+
+        {{-- ============================================ --}}
+        {{-- MODAL: Hubungi Superadmin                   --}}
+        {{-- ============================================ --}}
+        <div x-show="showModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 flex items-center justify-center" style="display: none;">
+            {{-- Backdrop --}}
+            <div class="absolute inset-0 bg-black/40" @click="showModal = false"></div>
+
+            {{-- Modal Content --}}
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
+                {{-- Header --}}
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Hubungi Superadmin</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Sampaikan kendala atau request akun baru</p>
+                    </div>
+                    <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 hover:cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                {{-- Success Message --}}
+                <div x-show="successMessage" class="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                    <span x-text="successMessage"></span>
+                </div>
+
+                {{-- Error Summary --}}
+                <div x-show="errorMessage" class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <span x-text="errorMessage"></span>
+                </div>
+
+                {{-- Form --}}
+                <form x-show="!successMessage" @submit.prevent="submitForm()" class="px-6 py-4 space-y-4">
+                    {{-- Kategori --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Kategori <span class="text-red-500">*</span></label>
+                        <select x-model="form.category" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition bg-white">
+                            <option value="">Pilih kategori</option>
+                            <option value="kendala_perangkat">Kendala Perangkat</option>
+                            <option value="kendala_aplikasi">Kendala Aplikasi</option>
+                            <option value="request_akun">Request Akun Baru</option>
+                            <option value="lainnya">Lainnya</option>
+                        </select>
+                        <template x-if="errors.category"><p class="text-xs text-red-500 mt-1" x-text="errors.category[0]"></p></template>
+                    </div>
+
+                    {{-- ID Perangkat (conditional) --}}
+                    <div x-show="form.category === 'kendala_perangkat'" x-transition>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">ID Perangkat <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="form.device_id" placeholder="Contoh: DEVICE_01" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition" />
+                        <template x-if="errors.device_id"><p class="text-xs text-red-500 mt-1" x-text="errors.device_id[0]"></p></template>
+                    </div>
+
+                    {{-- Role Diminta (conditional) --}}
+                    <div x-show="form.category === 'request_akun'" x-transition>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Role Diminta <span class="text-red-500">*</span></label>
+                        <select x-model="form.role_requested" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition bg-white">
+                            <option value="">Pilih role</option>
+                            <option value="nakes">Nakes (Perawat)</option>
+                            <option value="dokter">Dokter</option>
+                        </select>
+                        <template x-if="errors.role_requested"><p class="text-xs text-red-500 mt-1" x-text="errors.role_requested[0]"></p></template>
+                    </div>
+
+                    {{-- Instansi (conditional) --}}
+                    <div x-show="form.category === 'request_akun'" x-transition>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Instansi <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="form.institution" placeholder="Nama RS / organisasi" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition" />
+                        <template x-if="errors.institution"><p class="text-xs text-red-500 mt-1" x-text="errors.institution[0]"></p></template>
+                    </div>
+
+                    {{-- Nama Lengkap --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Nama Lengkap <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="form.full_name" placeholder="Nama lengkap Anda" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition" />
+                        <template x-if="errors.full_name"><p class="text-xs text-red-500 mt-1" x-text="errors.full_name[0]"></p></template>
+                    </div>
+
+                    {{-- Email --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Email <span class="text-red-500">*</span></label>
+                        <input type="email" x-model="form.email" placeholder="nama@email.com" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition" />
+                        <template x-if="errors.email"><p class="text-xs text-red-500 mt-1" x-text="errors.email[0]"></p></template>
+                    </div>
+
+                    {{-- No. HP --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">No. HP / WhatsApp</label>
+                        <input type="text" x-model="form.phone" placeholder="08xxxxxxxxxx (opsional)" class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition" />
+                    </div>
+
+                    {{-- Urgensi --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Urgensi <span class="text-red-500">*</span></label>
+                        <div class="flex gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="form.urgency" value="rendah" class="accent-[#00a884]" />
+                                <span class="text-sm text-gray-600">Rendah</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="form.urgency" value="sedang" class="accent-[#00a884]" />
+                                <span class="text-sm text-gray-600">Sedang</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="form.urgency" value="darurat" class="accent-red-500" />
+                                <span class="text-sm text-gray-600">Darurat</span>
+                            </label>
+                        </div>
+                        <template x-if="errors.urgency"><p class="text-xs text-red-500 mt-1" x-text="errors.urgency[0]"></p></template>
+                    </div>
+
+                    {{-- Detail Kendala --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Detail Kendala <span class="text-red-500">*</span></label>
+                        <textarea x-model="form.detail" rows="3" maxlength="1000" placeholder="Jelaskan kendala atau kebutuhan Anda..." class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/10 transition resize-none"></textarea>
+                        <p class="text-xs text-gray-400 mt-1"><span x-text="form.detail.length"></span>/1000 karakter</p>
+                        <template x-if="errors.detail"><p class="text-xs text-red-500 mt-1" x-text="errors.detail[0]"></p></template>
+                    </div>
+
+                    {{-- Upload Bukti (conditional) --}}
+                    <div x-show="form.category === 'kendala_perangkat' || form.category === 'kendala_aplikasi'" x-transition>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Upload Bukti</label>
+                        <input type="file" @change="handleFile($event)" accept=".jpg,.jpeg,.png" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#00a884]/10 file:text-[#00a884] hover:file:bg-[#00a884]/20 file:cursor-pointer" />
+                        <p class="text-xs text-gray-400 mt-1">JPG, JPEG, atau PNG. Maks 2MB.</p>
+                        <template x-if="errors.attachment"><p class="text-xs text-red-500 mt-1" x-text="errors.attachment[0]"></p></template>
+                    </div>
+
+                    {{-- Buttons --}}
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" @click="showModal = false" class="flex-1 h-10 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:cursor-pointer transition">
+                            Batal
+                        </button>
+                        <button type="submit" :disabled="loading" class="flex-1 h-10 bg-[#00a884] hover:bg-[#008f70] text-white rounded-lg text-sm font-medium hover:cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span x-show="!loading">Kirim Pesan</span>
+                            <span x-show="loading" class="flex items-center justify-center gap-2">
+                                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                Mengirim...
+                            </span>
+                        </button>
+                    </div>
+                </form>
+
+                {{-- Footer setelah sukses --}}
+                <div x-show="successMessage" class="px-6 py-4">
+                    <button @click="resetForm()" class="w-full h-10 bg-[#00a884] hover:bg-[#008f70] text-white rounded-lg text-sm font-medium hover:cursor-pointer transition">
+                        Tutup
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
+        {{-- Alpine.js CDN (belum ada di auth layout) --}}
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+        <script>
+            // ==========================================
+            // Report Modal Alpine.js Component
+            // ==========================================
+            function reportModal() {
+                return {
+                    showModal: false,
+                    loading: false,
+                    successMessage: '',
+                    errorMessage: '',
+                    errors: {},
+                    form: {
+                        category: '',
+                        device_id: '',
+                        role_requested: '',
+                        institution: '',
+                        full_name: '',
+                        email: '',
+                        phone: '',
+                        urgency: 'sedang',
+                        detail: '',
+                    },
+                    attachment: null,
+
+                    handleFile(event) {
+                        this.attachment = event.target.files[0];
+                    },
+
+                    async submitForm() {
+                        this.loading = true;
+                        this.errors = {};
+                        this.errorMessage = '';
+                        this.successMessage = '';
+
+                        try {
+                            const formData = new FormData();
+                            for (const key in this.form) {
+                                if (this.form[key]) {
+                                    formData.append(key, this.form[key]);
+                                }
+                            }
+                            if (this.attachment) {
+                                formData.append('attachment', this.attachment);
+                            }
+
+                            const response = await fetch('{{ route("report.store") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'Accept': 'application/json',
+                                },
+                                body: formData,
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                this.successMessage = data.message;
+                            } else if (response.status === 429) {
+                                this.errorMessage = data.message;
+                            } else {
+                                this.errorMessage = data.message || 'Terjadi kesalahan.';
+                            }
+                        } catch (error) {
+                            if (error.response) {
+                                const data = await error.response.json();
+                                if (data.errors) {
+                                    this.errors = data.errors;
+                                } else {
+                                    this.errorMessage = data.message || 'Terjadi kesalahan.';
+                                }
+                            } else {
+                                this.errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+                            }
+                        } finally {
+                            this.loading = false;
+                        }
+                    },
+
+                    resetForm() {
+                        this.showModal = false;
+                        this.successMessage = '';
+                        this.errorMessage = '';
+                        this.errors = {};
+                        this.form = {
+                            category: '',
+                            device_id: '',
+                            role_requested: '',
+                            institution: '',
+                            full_name: '',
+                            email: '',
+                            phone: '',
+                            urgency: 'sedang',
+                            detail: '',
+                        };
+                        this.attachment = null;
+                    },
+                };
+            }
+
+            // ==========================================
+            // Image Slider (existing)
+            // ==========================================
+            document.addEventListener('DOMContentLoaded', function () {
                 let cur = 0;
                 const slides = document.querySelectorAll('.slide');
                 const dots = document.querySelectorAll('.dot');
@@ -129,7 +383,6 @@
 
                 window.goSlide = goSlide;
                 window.changeSlide = changeSlide;
-
             });
         </script>
     @endpush

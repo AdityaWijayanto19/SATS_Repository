@@ -61,6 +61,8 @@
             $role = auth()->user()->role;
 
             if ($role === 'superadmin') {
+                $inboxUnread = \App\Models\SupportReport::where('status', 'baru')->count();
+
                 $menuItems = [
                     [
                         'key' => 'dashboard',
@@ -85,6 +87,15 @@
                         'routeIs' => 'superadmin.manajemen-user',
                         'icon' => '<path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>',
                         'children' => [],
+                    ],
+                    [
+                        'key' => 'inbox',
+                        'label' => 'Inbox',
+                        'route' => route('superadmin.inbox'),
+                        'routeIs' => 'superadmin.inbox',
+                        'icon' => '<path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>',
+                        'children' => [],
+                        'badge' => $inboxUnread > 0 ? $inboxUnread : null,
                     ],
                     [
                         'key' => 'laporan',
@@ -211,6 +222,13 @@
                         x-transition:leave-end="opacity-0"
                         class="text-sm font-medium whitespace-nowrap overflow-hidden"
                     >{{ $item['label'] }}</span>
+                    @if(!empty($item['badge']))
+                        <span
+                            x-show="sidebarOpen"
+                            style="display: none;"
+                            class="ml-auto flex-shrink-0 text-xs font-bold text-white bg-red-500 rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5"
+                        >{{ $item['badge'] }}</span>
+                    @endif
                     @if($hasChildren)
                         <svg
                             x-show="sidebarOpen"

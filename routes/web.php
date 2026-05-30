@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SupportController;
 
 // ============================================================
 // Public Routes
@@ -23,6 +24,9 @@ Route::get('/reset-password', [AuthController::class, 'showResetPassword'])
     ->name('password.reset')
     ->middleware('signed');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
+// Hubungi Superadmin (public, tanpa auth)
+Route::post('/report', [SupportController::class, 'store'])->name('report.store');
 
 // ============================================================
 // Protected Routes (Authenticated)
