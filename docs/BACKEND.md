@@ -19,7 +19,9 @@ app/
     Controllers/
       AuthController.php                # Login, logout, forgot/reset password
       DashboardController.php           # Role-based view resolver + API device list
-      UserController.php                # CRUD user (superadmin)
+      UserController.php                # CRUD user (superadmin, AJAX JSON response)
+      SuperadminInboxController.php     # Inbox superadmin (CRUD + filter + AJAX)
+      SupportController.php             # Public: kirim pesan dari guest (tanpa auth)
       ManajemenAlatController.php       # CRUD perangkat IoT (superadmin)
       LaporanController.php             # Laporan HTML + PDF nakes/dokter (real data)
       SuperadminLaporanController.php   # Laporan HTML + PDF superadmin
@@ -67,6 +69,7 @@ app/
     PatientMonitoringService.php        # Integrasi ML API (Hugging Face)
     MonitoringSessionService.php        # Session lifecycle: create, finalize, link patient
     ReportService.php                   # Report data: getReportData, getHistoryForChart, getStats
+      SupportService.php                  # Hubungi Superadmin: store, filter, status, broadcast
   Events/
     InstructionSent.php                 # Broadcast saat dokter kirim instruksi
     InstructionStatusUpdated.php        # Broadcast saat nakes selesaikan instruksi
@@ -74,6 +77,7 @@ app/
     DeviceStatusChanged.php             # Broadcast saat device online/offline
     SensorDataReceived.php              # Broadcast saat data sensor masuk
     ActivityLogCreated.php              # Broadcast activity log real-time
+    SupportReportCreated.php            # Broadcast saat guest kirim pesan (inbox real-time)
   Jobs/
     ProcessDeviceData.php               # Queue: proses system status device
     ProcessSensorData.php               # Queue: proses sensor data
@@ -396,12 +400,22 @@ python simulator.py
   - `DeviceMonitoring` model — dokter bisa monitor device tertentu
   - `NakesDeviceConfig` model — nakes di-assign ke device
 
-### Belum Dikerjakan
+- [x] **Hubungi Superadmin & Inbox**
+  - `SupportController` — public endpoint `POST /report` (tanpa auth)
+  - `SuperadminInboxController` — CRUD inbox (index, show, update, destroy)
+  - `SupportService` — business logic + broadcast event
+  - `SupportReportCreated` event — WebSocket broadcast ke `superadmin.dashboard`
+  - `StoreSupportReportRequest` — validasi conditional per kategori
+  - Rate limit: max 5x per email per hari
+  - Migration: tabel `reports` (category, device_id, role_requested, institution, full_name, email, phone, urgency, detail, attachment_path, status, admin_notes)
+  - Model: `SupportReport`
 
-- [ ] **Backend CRUD User (Routing)**
-  - UserController sudah ada method-nya
-  - Belum ada route di web.php
-  - Belum terhubung ke halaman manajemen-user
+- [x] **Manajemen User (AJAX)**
+  - `DashboardController::viewManajemenUserPage()` pass `$users` ke view
+  - `UserController::store()` dan `destroy()` support AJAX JSON response
+  - Frontend: data real dari database, AJAX tambah/hapus user
+
+### Belum Dikerjakan
 
 - [ ] **Laporan Superadmin dari Database**
   - SuperadminLaporanController masih pakai dummy data
@@ -448,7 +462,7 @@ python simulator.py
 ## Notes
 
 - Instruction endpoint ada di `api.php` dengan middleware `web` + `auth` (session auth)
-- `UserController` punya method tapi belum ada route di `web.php`
+- `UserController` sudah support AJAX JSON response (store, destroy)
 - `LaporanController` sudah pakai real data, `SuperadminLaporanController` masih dummy
 - `DeviceDataController@getDeviceConfig` mengembalikan nilai hardcoded
 - Cache SensorService: cleared on write (broadcast menggantikan polling)
@@ -464,4 +478,4 @@ python simulator.py
 
 ---
 
-*Last updated: 24 Mei 2026*
+*Last updated: 30 Mei 2026*

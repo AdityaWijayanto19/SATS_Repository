@@ -63,7 +63,7 @@
 | Role | Nama | Email | Password |
 |------|------|-------|----------|
 | `superadmin` | Super Admin | `admin@sats.id` | `password` |
-| `dokter` | Dr. Andi | `andi@sats.id` | `password` |
+| `dokter` | dr. Andi | `andi@sats.id` | `password` |
 | `nakes` | Suster Rina | `rina@sats.id` | `password` |
 
 > Seeder: `database/seeders/UserSeeder.php`
@@ -154,11 +154,12 @@
 
 ### 8. Manajemen User (Superadmin) [TERHUBUNG KE BACKEND]
 
-- Tabel pengguna (data dari database)
+- Tabel pengguna (data real dari database, loop via Alpine.js)
 - Badge peran berwarna: Super Admin (ungu), Dokter (biru), Perawat (pink)
-- Modal "+ Tambah User" (ID, Nama, Peran dropdown, Email)
-- Modal Detail user (avatar, role badge, telepon, tgl bergabung)
-- **Backend: UserController (store, update, destroy) + routes terdaftar di web.php**
+- Modal "+ Tambah User" (Nama, Peran dropdown, Email, Password) — **AJAX POST**
+- Modal Detail user (ID, nama, email, role badge, tgl bergabung)
+- **Modal konfirmasi hapus** (custom, bukan JS confirm)
+- **Backend: DashboardController (pass $users) + UserController (store, destroy) — AJAX JSON response**
 - **Routes:** POST `/superadmin/manajemen-user`, DELETE `/superadmin/manajemen-user/{user}`
 
 ### 9. Laporan Superadmin [UI SELESAI, DATA DUMMY]
@@ -174,7 +175,7 @@
 ### 10. Sidebar & Navbar [SELESAI]
 
 - Sidebar dinamis berdasarkan role:
-  - **Superadmin:** Dashboard, Manajemen Alat, Manajemen User, Laporan
+  - **Superadmin:** Dashboard, Manajemen Alat, Manajemen User, Inbox (badge counter), Laporan
   - **Dokter:** Dashboard, Input Data Pasien, Laporan, Instruksi
   - **Nakes:** Dashboard, Input Data Pasien, Laporan, Instruksi
 - Active state menggunakan `request()->routeIs()`
@@ -204,6 +205,28 @@
 - Footer dengan informasi project
 - **Layout:** `layouts/landing.blade.php`
 - **Sections:** `pages/landing/sections/` (7 file)
+
+### 10d. Hubungi Superadmin & Inbox [SELESAI]
+
+- **Form "Hubungi Superadmin"** di halaman login (tanpa auth/guest)
+  - Modal Alpine.js dengan conditional fields berdasarkan kategori
+  - Kategori: Kendala Perangkat, Kendala Aplikasi, Request Akun Baru, Lainnya
+  - Field opsional: ID Perangkat, Role Diminta, Instansi, Upload Bukti (jpg/png, max 2MB)
+  - Submit via AJAX, rate limit 5x/email/hari
+- **Inbox Superadmin** — menu baru di sidebar dengan badge counter merah
+  - Tabel pesan dengan filter (kategori, urgensi, status) + search + pagination
+  - Detail modal: info lengkap + preview gambar + ubah status + catatan admin
+  - **Real-time update** via WebSocket (Laravel Reverb) — pesan baru langsung muncul tanpa refresh
+  - Shortcut "Buat Akun" untuk kategori Request Akun → redirect ke Manajemen User
+  - **Modal konfirmasi hapus** (custom)
+- **Backend:**
+  - `SupportController` (public, tanpa auth) — `POST /report`
+  - `SuperadminInboxController` — CRUD inbox
+  - `SupportService` — business logic + broadcast event
+  - `SupportReportCreated` event — WebSocket broadcast ke channel `superadmin.dashboard`
+  - `StoreSupportReportRequest` — validasi conditional per kategori
+  - Migration: tabel `reports`
+  - Model: `SupportReport`
 
 ### 11. Backend & Database [SEBAGIAN BESAR SELESAI]
 
@@ -299,7 +322,7 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 - [ ] Device config dari database (ganti hardcoded)
 - [x] Activity log: 16 event types sudah terinstrumentasi
 - [x] Monitoring session system (auto-create ON, finalize OFF, auto-generate RM)
-- [ ] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun (guest), inbox superadmin (plan: `docs/plan-hubungi-superadmin.md`)
+- [x] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun (guest), inbox superadmin real-time (plan: `docs/plan-hubungi-superadmin.md`)
 
 ### Prioritas 4 — Integrasi & Testing
 - [ ] Testing dengan hardware IoT real
@@ -322,12 +345,14 @@ Integrasi ML prediksi kondisi pasien via Hugging Face Spaces (Gradio async 2-ste
 app/Http/Controllers/
   AuthController.php              # Login, logout, forgot/reset password
   DashboardController.php         # Role-based view resolver + API device list
-  UserController.php              # CRUD user (superadmin)
+  UserController.php              # CRUD user (superadmin, AJAX support)
   ManajemenAlatController.php     # CRUD perangkat IoT (superadmin)
   LaporanController.php           # Laporan HTML + PDF nakes/dokter (real data + AJAX)
   SuperadminLaporanController.php # Laporan HTML + PDF superadmin
+  SuperadminInboxController.php   # Inbox superadmin (CRUD + filter + AJAX)
   PatientController.php           # Input data pasien + link ke monitoring session
   ProfileController.php           # Edit profil user (nama, email, password, foto)
+  SupportController.php           # Public: kirim pesan dari guest (tanpa auth)
   Api/
     DeviceDataController.php      # Autentikasi device, system status, session lifecycle
     SensorDataController.php      # Sensor data endpoint (store, latest, history)
@@ -341,12 +366,14 @@ app/Services/
   SensorService.php               # Sensor data operations + caching + trigger ML
   MonitoringSessionService.php    # Session lifecycle: create, finalize, link patient
   ReportService.php               # Report data: getReportData, getChart, getStats
+  SupportService.php              # Hubungi Superadmin: store, filter, status, broadcast
 
 app/Events/
   InstructionSent.php             # Broadcast saat dokter kirim instruksi
   InstructionStatusUpdated.php    # Broadcast saat nakes selesaikan instruksi
   InstructionReportSubmitted.php  # Broadcast saat nakes submit laporan
   ActivityLogCreated.php          # Broadcast activity log real-time ke superadmin dashboard
+  SupportReportCreated.php        # Broadcast saat guest kirim pesan (inbox real-time)
 
 app/Jobs/
   ProcessDeviceData.php           # Queue: proses system status device
@@ -427,7 +454,8 @@ resources/views/
     superadmin/
       dashboard.blade.php         # Stat cards, tabel kritis, log aktivitas
       manajemen-alat.blade.php    # Inventaris alat + modal (CRUD active)
-      manajemen-user.blade.php    # Manajemen user + modal
+      manajemen-user.blade.php    # Manajemen user + modal (data real, AJAX)
+      inbox.blade.php             # Inbox pesan dari guest (real-time WebSocket)
       laporan.blade.php           # Laporan + chart + tabel sensor
       laporan-pdf.blade.php       # Template PDF landscape
 ```
@@ -688,4 +716,4 @@ Download PDF laporan
 
 ---
 
-*Last updated: 24 Mei 2026 (monitoring session, laporan real data, AJAX, input pasien)*
+*Last updated: 30 Mei 2026 (hubungi superadmin, inbox real-time, manajemen user AJAX, custom delete modal)*

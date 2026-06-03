@@ -55,8 +55,9 @@ resources/views/
       monitor-3d.blade.php    # Monitoring 3D
     superadmin/
       dashboard.blade.php     # Dashboard superadmin (stat cards, tabel kritis, log)
-      manajemen-alat.blade.php # Inventaris alat + modal tambah & detail alat
-      manajemen-user.blade.php # Manajemen user + modal tambah & detail user
+      manajemen-alat.blade.php # Inventaris alat + modal tambah & detail alat + custom delete modal
+      manajemen-user.blade.php # Manajemen user (data real) + modal tambah & detail + custom delete modal
+      inbox.blade.php          # Inbox pesan dari guest (real-time WebSocket, filter, detail)
       laporan.blade.php       # Laporan superadmin (filter, stat cards, chart, tabel sensor)
       laporan-pdf.blade.php   # Template PDF laporan superadmin (landscape A4)
     landing/
@@ -96,6 +97,7 @@ resources/views/
 | POST   | `/forgot-password` | `password.email`   |
 | GET    | `/reset-password`  | `password.reset`   |
 | POST   | `/reset-password`  | `password.update`  |
+| POST   | `/report`          | `report.store`     |
 
 ### Profile (auth, semua role)
 | Method | URI              | Name            |
@@ -132,6 +134,10 @@ resources/views/
 | GET    | `/superadmin/input-data-pasien`| `superadmin.input-data-pasien` |
 | GET    | `/superadmin/laporan`          | `superadmin.laporan`        |
 | GET    | `/superadmin/laporan/pdf`      | `superadmin.laporan.pdf`    |
+| GET    | `/superadmin/inbox`            | `superadmin.inbox`          |
+| GET    | `/superadmin/inbox/{report}`   | `superadmin.inbox.show`     |
+| PATCH  | `/superadmin/inbox/{report}`   | `superadmin.inbox.update`   |
+| DELETE | `/superadmin/inbox/{report}`   | `superadmin.inbox.destroy`  |
 
 ---
 
@@ -186,16 +192,19 @@ resources/views/
 - [x] Chat: foto profil pengganti inisial role (DR/NK → foto avatar)
 - [x] Landing page + 7 section (hero, tentang, fitur, alat, cara kerja, FAQ, closing)
 - [x] Activity log realtime via WebSocket (PrivateChannel + Alpine double-init fix)
+- [x] Manajemen user: data real dari database + AJAX tambah/hapus user
+- [x] Custom delete confirmation modal (inbox, alat, user)
+- [x] Hubungi Superadmin: form guest di halaman login + modal conditional fields
+- [x] Inbox superadmin: tabel + filter + search + detail modal + real-time WebSocket
+- [x] Sidebar superadmin: menu Inbox + badge counter merah
 - [x] Dashboard nakes: fetchActiveSession() saat device online (tanpa refresh)
 - [x] PDF download dengan data real (DomPDF + QuickChart.io, nama file = nomor rekam medis)
 
 ### Belum Dikerjakan
-- [ ] Route untuk UserController (CRUD user belum terhubung ke UI)
 - [ ] Laporan superadmin dari database (masih dummy data)
 - [ ] Integrasi IoT real (simulator sudah ada, hardware belum)
 - [ ] Notifikasi instruksi terkirim (toast/snackbar)
 - [ ] Warning/highlight saat instruksi diselesaikan nakes
-- [ ] **Fitur Hubungi Superadmin + Inbox** — form pelaporan kendala & request akun dari halaman login, inbox di dashboard superadmin (plan: `docs/plan-hubungi-superadmin.md`)
 
 ---
 

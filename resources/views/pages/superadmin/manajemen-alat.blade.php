@@ -66,7 +66,7 @@
                             <td class="px-6 py-3">
                                 <div class="flex items-center justify-center gap-2">
                                     <button @click="showDetail(index)" class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Detail</button>
-                                    <button @click="hapusAlat(device.id)" class="text-red-600 hover:text-red-800 text-xs font-medium bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Hapus</button>
+                                    <button @click="showDeleteConfirm(device.id)" class="text-red-600 hover:text-red-800 text-xs font-medium bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Hapus</button>
                                 </div>
                             </td>
                         </tr>
@@ -273,6 +273,27 @@
         </div>
     </div>
 
+    {{-- Modal Konfirmasi Hapus --}}
+    <div x-show="showDeleteModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 flex items-center justify-center" style="display: none;">
+        <div class="absolute inset-0 bg-black/40" @click="showDeleteModal = false"></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
+            <div class="px-6 py-5 text-center">
+                <div class="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-1">Hapus Perangkat?</h3>
+                <p class="text-sm text-gray-500 mb-1">Perangkat <span class="font-mono font-medium text-gray-700" x-text="deleteTargetId"></span></p>
+                <p class="text-sm text-gray-500 mb-6">Semua data terkait akan dihapus secara permanen.</p>
+                <div class="flex gap-3">
+                    <button @click="showDeleteModal = false" class="flex-1 h-10 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 cursor-pointer transition">Batal</button>
+                    <button @click="confirmDelete()" class="flex-1 h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium cursor-pointer transition">Ya, Hapus</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @push('scripts')
@@ -285,6 +306,8 @@
             showTambahModal: false,
             showDetailModal: false,
             showApiKeyModal: false,
+            showDeleteModal: false,
+            deleteTargetId: null,
             selectedDevice: null,
             loading: false,
             copied: false,
@@ -373,11 +396,16 @@
                 }
             },
 
-            async hapusAlat(deviceId) {
-                if (!confirm(`Hapus perangkat ${deviceId}? Semua data terkait akan dihapus.`)) return;
+            showDeleteConfirm(deviceId) {
+                this.deleteTargetId = deviceId;
+                this.showDeleteModal = true;
+            },
+
+            async confirmDelete() {
+                if (!this.deleteTargetId) return;
 
                 try {
-                    const response = await fetch(`/superadmin/manajemen-alat/${deviceId}`, {
+                    const response = await fetch(`/superadmin/manajemen-alat/${this.deleteTargetId}`, {
                         method: 'DELETE',
                         headers: {
                             'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -388,7 +416,9 @@
                     const result = await response.json();
 
                     if (result.success) {
-                        this.devices = this.devices.filter(d => d.id !== deviceId);
+                        this.devices = this.devices.filter(d => d.id !== this.deleteTargetId);
+                        this.showDeleteModal = false;
+                        this.deleteTargetId = null;
                     } else {
                         alert(result.message || 'Gagal menghapus perangkat');
                     }

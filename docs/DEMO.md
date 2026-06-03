@@ -425,7 +425,7 @@ Profile simulator:
 | Role | Nama | Email | Password | Dashboard |
 |------|------|-------|----------|-----------|
 | Superadmin | Super Admin | `admin@sats.id` | `password` | `/superadmin/dashboard` |
-| Dokter | Dr. Andi | `andi@sats.id` | `password` | `/dokter/dashboard` |
+| Dokter | dr. Andi | `andi@sats.id` | `password` | `/dokter/dashboard` |
 | Nakes | Suster Rina | `rina@sats.id` | `password` | `/nakes/dashboard` |
 
 ### Device & API Key (dari Seeder)

@@ -434,7 +434,7 @@ GET /api/instruction?device_id=DEVICE_01
       "id": 1,
       "instruksi_dokter": "Berikan oksigen 2L/menit",
       "is_completed": false,
-      "user_name": "Dr. Andi",
+      "user_name": "dr. Andi",
       "nakes_name": "Suster Rina",
       "waktu": "14:30",
       "completed_at": null,
