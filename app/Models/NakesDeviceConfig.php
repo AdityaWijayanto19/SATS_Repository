@@ -9,8 +9,6 @@ class NakesDeviceConfig extends Model
     protected $fillable = [
         'user_id',
         'device_id',
-        'wifi_name',
-        'wifi_password',
     ];
 
     public function user()

@@ -110,8 +110,6 @@ class DashboardService
         NakesDeviceConfig::create([
             'user_id' => Auth::id(),
             'device_id' => $matchedKey->device_id,
-            'wifi_name' => $data['wifi_name'],
-            'wifi_password' => $data['wifi_password'],
         ]);
 
         return ['success' => true];
@@ -182,13 +180,23 @@ class DashboardService
     }
 
     /**
-     * API: daftar semua perangkat + data grafik (untuk polling dashboard).
+     * API: daftar perangkat + data grafik (untuk polling dashboard).
+     * Nakes hanya melihat device miliknya, dokter/superadmin melihat semua.
      */
     public function getDevicesApi(int $minutes = 10)
     {
         $from = now()->subMinutes($minutes);
+        $user = Auth::user();
 
-        return Devices::all()->map(function ($device) use ($from) {
+        // Filter device berdasarkan role
+        if ($user && $user->role === 'nakes') {
+            $config = NakesDeviceConfig::where('user_id', $user->id)->first();
+            $devices = $config ? Devices::where('device_id', $config->device_id)->get() : collect();
+        } else {
+            $devices = Devices::all();
+        }
+
+        return $devices->map(function ($device) use ($from) {
             $latest = SensorData::where('device_id', $device->device_id)
                 ->latest('created_at')
                 ->first();
@@ -213,12 +221,14 @@ class DashboardService
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
                     'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
-                    'ml_prediction' => $device->ml_prediction,
-                    'ml_condition' => $device->ml_condition,
-                    'ml_risk_level' => $device->ml_risk_level,
-                    'ml_probabilities' => json_decode($device->ml_probabilities, true),
-                    'ml_predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
+                'ml' => [
+                    'prediction' => $device->ml_prediction,
+                    'condition' => $device->ml_condition,
+                    'risk_level' => $device->ml_risk_level,
+                    'probabilities' => json_decode($device->ml_probabilities, true),
+                    'predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
+                ],
                 'history' => [
                     'labels' => $history->map(fn($d) => $d->created_at->setTimezone('Asia/Jakarta')->format('H:i')),
                     'heart_rate' => $history->pluck('heart_rate'),
@@ -259,12 +269,14 @@ class DashboardService
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
                     'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
-                    'ml_prediction' => $device->ml_prediction,
-                    'ml_condition' => $device->ml_condition,
-                    'ml_risk_level' => $device->ml_risk_level,
-                    'ml_probabilities' => json_decode($device->ml_probabilities, true),
-                    'ml_predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
+                'ml' => [
+                    'prediction' => $device->ml_prediction,
+                    'condition' => $device->ml_condition,
+                    'risk_level' => $device->ml_risk_level,
+                    'probabilities' => json_decode($device->ml_probabilities, true),
+                    'predicted_at' => $device->ml_predicted_at?->setTimezone('Asia/Jakarta')->format('H:i'),
+                ],
                 'active_session' => $activeSession ? [
                     'id' => $activeSession->id,
                     'medical_record_number' => $activeSession->medical_record_number,
