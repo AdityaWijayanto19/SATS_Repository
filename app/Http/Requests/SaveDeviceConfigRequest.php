@@ -14,8 +14,6 @@ class SaveDeviceConfigRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'wifi_name' => 'required|string|max:255',
-            'wifi_password' => 'required|string|max:255',
             'api_key' => 'required|string',
         ];
     }

@@ -15,7 +15,7 @@ class InstructionService
     {
         // Query ke tabel instructions berdasarkan device_id
         return Instruction::where('device_id', $device_id)
-            ->with(['dokter:id,name,photo', 'nakes:id,name,photo', 'creator:id,name,photo'])
+            ->with(['dokter:id,name,photo', 'nakes:id,name,photo'])
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($item) {
@@ -23,8 +23,8 @@ class InstructionService
                     'id'              => $item->id,
                     'instruksi_dokter' => $item->instruksi_dokter,
                     'is_completed'    => (bool) $item->is_completed,
-                    'user_name'       => $item->dokter?->name ?? $item->creator?->name ?? 'Dokter SATS',
-                    'user_photo'      => $item->dokter?->photo ?? $item->creator?->photo ?? null,
+                    'user_name'       => $item->dokter?->name ?? 'Dokter SATS',
+                    'user_photo'      => $item->dokter?->photo ?? null,
                     'nakes_name'      => $item->nakes?->name ?? 'Nakes SATS',
                     'nakes_photo'     => $item->nakes?->photo ?? null,
                     'waktu'           => $item->created_at->setTimezone('Asia/Jakarta')->format('H:i'),

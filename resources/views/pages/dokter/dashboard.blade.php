@@ -25,12 +25,14 @@
                     class="absolute right-0 mt-2 w-52 bg-white border border-[rgba(0,83,63,0.15)] rounded-xl shadow-sm z-50 overflow-hidden">
                     <template x-for="device in allDevices" :key="device.device_id">
                         <div @click="selectDevice(device.device_id); dropdownOpen = false"
-                            class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer"
-                            :class="device.device_id === selectedDeviceId ? 'text-[rgb(0,62,48)] font-bold bg-green-50' : 'text-[rgb(0,62,48)]'"
-                            x-text="device.device_id"></div>
+                            class="px-4 py-2.5 text-sm hover:bg-[rgba(0,83,63,0.06)] cursor-pointer flex items-center justify-between"
+                            :class="device.device_id === selectedDeviceId ? 'text-[rgb(0,62,48)] font-bold bg-green-50' : 'text-[rgb(0,62,48)]'">
+                            <span x-text="device.device_id"></span>
+                            <span class="w-2 h-2 rounded-full" :class="device.status === 'online' ? 'bg-green-500' : 'bg-gray-300'"></span>
+                        </div>
                     </template>
                     <div x-show="allDevices.length === 0" class="px-4 py-3 text-sm text-gray-400 text-center">
-                        Tidak ada perangkat online
+                        Tidak ada perangkat terdaftar
                     </div>
                 </div>
             </div>
@@ -93,44 +95,44 @@
         </div>
 
         {{-- Prediksi Machine Learning --}}
-        <div x-show="selectedDeviceId" x-transition
+        <div x-show="selectedDeviceId && ml" x-transition
             class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
             <span class="w-2 h-2 rounded-full flex-shrink-0"
                 :class="{
-                    'bg-green-400': latest?.ml_condition === 'NORMAL',
-                    'bg-orange-400': latest?.ml_condition === 'WARNING',
-                    'bg-red-400': latest?.ml_condition === 'CRITICAL',
-                    'bg-gray-300': !latest?.ml_condition
+                    'bg-green-400': ml?.condition === 'NORMAL',
+                    'bg-orange-400': ml?.condition === 'WARNING',
+                    'bg-red-400': ml?.condition === 'CRITICAL',
+                    'bg-gray-300': !ml?.condition
                 }"></span>
             <div class="flex-1">
                 <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
                 <p class="text-sm font-medium text-[rgb(0,62,48)]">
-                    <span x-show="latest?.ml_prediction" x-text="latest?.ml_prediction"></span>
-                    <span x-show="!latest?.ml_prediction">Data prediksi belum tersedia.</span>
+                    <span x-show="ml?.prediction" x-text="ml?.prediction"></span>
+                    <span x-show="!ml?.prediction">Data prediksi belum tersedia.</span>
                 </p>
             </div>
-            <span x-show="latest?.ml_condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
+            <span x-show="ml?.condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
                 :class="{
-                    'bg-green-100 text-green-700': latest?.ml_condition === 'NORMAL',
-                    'bg-orange-100 text-orange-700': latest?.ml_condition === 'WARNING',
-                    'bg-red-100 text-red-700': latest?.ml_condition === 'CRITICAL'
+                    'bg-green-100 text-green-700': ml?.condition === 'NORMAL',
+                    'bg-orange-100 text-orange-700': ml?.condition === 'WARNING',
+                    'bg-red-100 text-red-700': ml?.condition === 'CRITICAL'
                 }"
-                x-text="latest?.ml_risk_level ?? latest?.ml_condition">
+                x-text="ml?.risk_level ?? ml?.condition">
             </span>
         </div>
 
         {{-- Probabilitas Kondisi Pasien --}}
-        <div x-show="selectedDeviceId && latest?.ml_probabilities" x-transition
+        <div x-show="selectedDeviceId && ml?.probabilities" x-transition
             class="grid grid-cols-3 gap-3 mb-4">
 
             {{-- Membaik --}}
             <div class="bg-green-50 rounded-xl p-4 border border-green-200 text-center">
                 <p class="text-xs font-medium text-green-500 mb-1">Membaik</p>
                 <p class="text-3xl font-bold text-green-600"
-                    x-text="(latest?.ml_probabilities?.membaik ?? '—') + (latest?.ml_probabilities?.membaik != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.membaik ?? '—') + (ml?.probabilities?.membaik != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-green-100 rounded-full h-1.5">
                     <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.membaik ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.membaik ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -138,10 +140,10 @@
             <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-center">
                 <p class="text-xs font-medium text-yellow-500 mb-1">Stabil</p>
                 <p class="text-3xl font-bold text-yellow-600"
-                    x-text="(latest?.ml_probabilities?.stabil ?? '—') + (latest?.ml_probabilities?.stabil != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.stabil ?? '—') + (ml?.probabilities?.stabil != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-yellow-100 rounded-full h-1.5">
                     <div class="bg-yellow-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.stabil ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.stabil ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -149,10 +151,10 @@
             <div class="bg-red-50 rounded-xl p-4 border border-red-200 text-center">
                 <p class="text-xs font-medium text-red-400 mb-1">Memburuk</p>
                 <p class="text-3xl font-bold text-red-500"
-                    x-text="(latest?.ml_probabilities?.memburuk ?? '—') + (latest?.ml_probabilities?.memburuk != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.memburuk ?? '—') + (ml?.probabilities?.memburuk != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-red-100 rounded-full h-1.5">
                     <div class="bg-red-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.memburuk ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.memburuk ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -241,6 +243,9 @@
             let hrChart, spo2Chart, tempChart, combinedChart;
 
             function initCharts() {
+                [hrChart, spo2Chart, tempChart].forEach(c => { if (c) c.destroy(); });
+                hrChart = spo2Chart = tempChart = null;
+
                 const chartOpts = {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -376,10 +381,12 @@
             function dashboard() {
                 return {
                     allDevices: [],
-                    allDeviceIds: [], // ALL known device IDs (online + offline) for WebSocket subscriptions
+                    allDeviceIds: [],
+                    subscribedIds: new Set(),
                     selectedDeviceId: localStorage.getItem('selectedMonitoringDeviceDoc') || null,
                     dropdownOpen: false,
                     latest: null,
+                    ml: null,
                     chartMode: 'separate',
 
                     async init() {
@@ -405,20 +412,21 @@
                             const res = await fetch('/api/devices');
                             const json = await res.json();
                             if (json.success) {
-                                // Store ALL device IDs for WebSocket subscriptions (online + offline)
+                                // Dokter bisa melihat SEMUA device (online + offline)
+                                this.allDevices = json.data;
                                 this.allDeviceIds = json.data.map(d => d.device_id);
-                                // Only show online devices in the UI dropdown
-                                this.allDevices = json.data.filter(d => d.status === 'online');
 
                                 if (this.selectedDeviceId) {
                                     const selected = this.allDevices.find(d => d.device_id === this.selectedDeviceId);
                                     if (selected) {
                                         this.latest = selected.latest;
+                                        this.ml = selected.ml ?? null;
                                         updateCharts(selected.history);
                                     } else {
                                         this.selectedDeviceId = null;
                                         globalSelectedDeviceId = null;
                                         this.latest = null;
+                                        this.ml = null;
                                         updateCharts(null);
                                     }
                                 }
@@ -439,32 +447,40 @@
                     },
 
                     subscribeAllDevices() {
-                        // Include selectedDeviceId even if not in allDeviceIds yet
                         const ids = [...this.allDeviceIds];
                         if (this.selectedDeviceId && !ids.includes(this.selectedDeviceId)) {
                             ids.push(this.selectedDeviceId);
                         }
 
                         ids.forEach(deviceId => {
+                            if (this.subscribedIds.has(deviceId)) return;
+                            this.subscribedIds.add(deviceId);
+
                             window.Echo.private(`device.${deviceId}`)
                                 .listen('.device.status.changed', async (e) => {
                                     if (e.status === 'offline') {
-                                        this.allDevices = this.allDevices.filter(d => d.device_id !== e.device_id);
+                                        const dev = this.allDevices.find(d => d.device_id === e.device_id);
+                                        if (dev) dev.status = 'offline';
                                         if (this.selectedDeviceId === e.device_id) {
-                                            this.selectedDeviceId = null;
-                                            globalSelectedDeviceId = null;
                                             this.latest = null;
                                             updateCharts(null);
                                         }
                                     } else {
-                                        // Device online — refresh list + re-subscribe
                                         await this.fetchDevices();
-                                        this.subscribeAllDevices();
                                     }
                                 })
                                 .listen('.sensor.data.received', (e) => {
                                     if (this.selectedDeviceId === e.device_id) {
                                         this.latest = e.latest;
+                                        if (e.latest?.ml_prediction) {
+                                            this.ml = {
+                                                prediction: e.latest.ml_prediction,
+                                                condition: e.latest.ml_condition,
+                                                risk_level: e.latest.ml_risk_level,
+                                                probabilities: e.latest.ml_probabilities,
+                                                predicted_at: e.latest.ml_predicted_at,
+                                            };
+                                        }
                                         updateCharts(e.history);
                                     }
                                 });
@@ -477,6 +493,7 @@
                         const selected = this.allDevices.find(d => d.device_id === deviceId);
                         if (selected) {
                             this.latest = selected.latest;
+                            this.ml = selected.ml ?? null;
                             updateCharts(selected.history);
                         }
                         window.dispatchEvent(new CustomEvent('deviceSelected', { detail: { deviceId } }));

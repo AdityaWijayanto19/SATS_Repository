@@ -163,45 +163,45 @@
         </div>
 
         {{-- Prediksi ML --}}
-        <div x-show="latest"
+        <div x-show="ml"
             class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
             <span class="w-2 h-2 rounded-full flex-shrink-0"
                 :class="{
-                    'bg-green-400': latest?.ml_condition === 'NORMAL',
-                    'bg-orange-400': latest?.ml_condition === 'WARNING',
-                    'bg-red-400': latest?.ml_condition === 'CRITICAL',
-                    'bg-gray-300': !latest?.ml_condition
+                    'bg-green-400': ml?.condition === 'NORMAL',
+                    'bg-orange-400': ml?.condition === 'WARNING',
+                    'bg-red-400': ml?.condition === 'CRITICAL',
+                    'bg-gray-300': !ml?.condition
                 }"></span>
 
             <div class="flex-1">
                 <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Prediksi ML</p>
                 <p class="text-sm font-medium text-[rgb(0,62,48)]">
-                    <span x-show="latest?.ml_prediction" x-text="latest?.ml_prediction"></span>
-                    <span x-show="!latest?.ml_prediction">Data prediksi belum tersedia.</span>
+                    <span x-show="ml?.prediction" x-text="ml?.prediction"></span>
+                    <span x-show="!ml?.prediction">Data prediksi belum tersedia.</span>
                 </p>
             </div>
 
-            <span x-show="latest?.ml_condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
+            <span x-show="ml?.condition" class="text-[10px] font-medium px-2.5 py-1 rounded flex-shrink-0"
                 :class="{
-                    'bg-green-100 text-green-700': latest?.ml_condition === 'NORMAL',
-                    'bg-orange-100 text-orange-700': latest?.ml_condition === 'WARNING',
-                    'bg-red-100 text-red-700': latest?.ml_condition === 'CRITICAL'
+                    'bg-green-100 text-green-700': ml?.condition === 'NORMAL',
+                    'bg-orange-100 text-orange-700': ml?.condition === 'WARNING',
+                    'bg-red-100 text-red-700': ml?.condition === 'CRITICAL'
                 }"
-                x-text="latest?.ml_risk_level ?? latest?.ml_condition"></span>
+                x-text="ml?.risk_level ?? ml?.condition"></span>
         </div>
 
         {{-- Probabilitas Kondisi Pasien --}}
-        <div x-show="latest?.ml_probabilities" x-transition
+        <div x-show="ml?.probabilities" x-transition
             class="grid grid-cols-3 gap-3 mb-4">
 
             {{-- Membaik --}}
             <div class="bg-green-50 rounded-xl p-4 border border-green-200 text-center">
                 <p class="text-xs font-medium text-green-500 mb-1">Membaik</p>
                 <p class="text-3xl font-bold text-green-600"
-                    x-text="(latest?.ml_probabilities?.membaik ?? '—') + (latest?.ml_probabilities?.membaik != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.membaik ?? '—') + (ml?.probabilities?.membaik != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-green-100 rounded-full h-1.5">
                     <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.membaik ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.membaik ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -209,10 +209,10 @@
             <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200 text-center">
                 <p class="text-xs font-medium text-yellow-500 mb-1">Stabil</p>
                 <p class="text-3xl font-bold text-yellow-600"
-                    x-text="(latest?.ml_probabilities?.stabil ?? '—') + (latest?.ml_probabilities?.stabil != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.stabil ?? '—') + (ml?.probabilities?.stabil != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-yellow-100 rounded-full h-1.5">
                     <div class="bg-yellow-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.stabil ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.stabil ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -220,10 +220,10 @@
             <div class="bg-red-50 rounded-xl p-4 border border-red-200 text-center">
                 <p class="text-xs font-medium text-red-400 mb-1">Memburuk</p>
                 <p class="text-3xl font-bold text-red-500"
-                    x-text="(latest?.ml_probabilities?.memburuk ?? '—') + (latest?.ml_probabilities?.memburuk != null ? '%' : '')"></p>
+                    x-text="(ml?.probabilities?.memburuk ?? '—') + (ml?.probabilities?.memburuk != null ? '%' : '')"></p>
                 <div class="mt-2 w-full bg-red-100 rounded-full h-1.5">
                     <div class="bg-red-500 h-1.5 rounded-full transition-all duration-500"
-                        :style="'width:' + (latest?.ml_probabilities?.memburuk ?? 0) + '%'"></div>
+                        :style="'width:' + (ml?.probabilities?.memburuk ?? 0) + '%'"></div>
                 </div>
             </div>
 
@@ -429,6 +429,7 @@
                 return {
                     selectedDeviceId: null,
                     latest: null,
+                    ml: null,
                     deviceOnline: false,
                     chartMode: 'separate',
                     activeSession: null,
@@ -445,6 +446,7 @@
                                 this.selectedDeviceId = device.device_id;
                                 globalSelectedDeviceId = this.selectedDeviceId;
                                 this.latest = device.latest;
+                                this.ml = device.ml ?? null;
                                 this.deviceOnline = device.status === 'online';
                                 this.activeSession = device.active_session ?? null;
                                 this.showSessionBanner = true;
@@ -488,6 +490,15 @@
                             })
                             .listen('.sensor.data.received', (e) => {
                                 this.latest = e.latest;
+                                if (e.latest?.ml_prediction) {
+                                    this.ml = {
+                                        prediction: e.latest.ml_prediction,
+                                        condition: e.latest.ml_condition,
+                                        risk_level: e.latest.ml_risk_level,
+                                        probabilities: e.latest.ml_probabilities,
+                                        predicted_at: e.latest.ml_predicted_at,
+                                    };
+                                }
                                 updateCharts(e.history);
                             });
                     },
