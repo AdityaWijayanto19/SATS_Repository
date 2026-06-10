@@ -8,7 +8,7 @@
  *   1. POST data vital signs → dapat event_id
  *   2. GET hasil prediksi pakai event_id (Server-Sent Events)
  *
- * Input: 15 angka (5 menit × 3 vital signs: HR, Temp, SpO2)
+ * Input: 16 elemen (1 kategori usia + 5 menit × 3 vital signs: HR, Temp, SpO2)
  * Output: prediksi teks, probabilitas, kondisi (NORMAL/WARNING/CRITICAL), risk level
  *
  * Dokumentasi lengkap: API_INTEGRATION.md
@@ -27,7 +27,7 @@ class PatientMonitoringService
     /**
      * Kirim data vital signs ke ML API dan ambil hasil prediksi.
      *
-     * @param array $vitalSigns Array flat 15 angka [hr1, temp1, spo21, ..., hr5, temp5, spo25]
+     * @param array $vitalSigns Array 16 elemen [ageGroup, hr1, temp1, spo21, ..., hr5, temp5, spo25]
      * @return array|null ['prediction' => string, 'probabilities' => string, 'condition' => string, 'risk_level' => string]
      */
     public function predict(array $vitalSigns): ?array
@@ -36,7 +36,7 @@ class PatientMonitoringService
             Log::info('ML API: calling predict', ['data_count' => count($vitalSigns)]);
 
             // Step 1: Kirim data, dapat event_id
-            $response1 = Http::timeout(10)->post("{$this->apiUrl}/gradio_api/call/predict", [
+            $response1 = Http::timeout(10)->post("{$this->apiUrl}/gradio_api/call/predict_manual", [
                 'data' => $vitalSigns,
             ]);
 
@@ -54,7 +54,7 @@ class PatientMonitoringService
             Log::info('ML API: got event_id', ['event_id' => $eventId]);
 
             // Step 2: Ambil hasil pakai event_id (SSE response)
-            $response2 = Http::timeout(15)->get("{$this->apiUrl}/gradio_api/call/predict/{$eventId}");
+            $response2 = Http::timeout(15)->get("{$this->apiUrl}/gradio_api/call/predict_manual/{$eventId}");
 
             if (!$response2->successful()) {
                 Log::error('ML API Step 2 failed', ['status' => $response2->status(), 'body' => $response2->body()]);
@@ -136,7 +136,7 @@ class PatientMonitoringService
      * Ambil 5 data sensor terakhir dari device dan format untuk ML API.
      *
      * @param string $deviceId
-     * @return array|null Array flat 15 angka (5 menit × 3 vital signs) atau null jika data kosong
+     * @return array|null Array 16 elemen [ageGroup, hr1, temp1, spo2, ..., hr5, temp5, spo25] atau null jika data kosong
      */
     public function getVitalSignsForDevice(string $deviceId): ?array
     {
@@ -152,14 +152,17 @@ class PatientMonitoringService
             return null;
         }
 
+        // Ambil kategori_usia dari data sensor terbaru
+        $ageGroup = $readings->last()->kategori_usia ?? 'Dewasa';
+
         // Jika kurang dari 5, duplikasi data pertama untuk mengisi
         while ($readings->count() < 5) {
             $readings->prepend($readings->first());
         }
 
-        // Format ke flat array: [HR, Temp, SpO2] × 5 = 15 angka
-        // Urutan sesuai API_INTEGRATION.md: HR, Temp, SpO2
-        $data = [];
+        // Format ke flat array: [ageGroup, HR, Temp, SpO2] × 5 = 1 string + 15 angka = 16 elemen
+        // Urutan sesuai API_INTEGRATION.md: kategori_usia, HR, Temp, SpO2
+        $data = [$ageGroup];
         foreach ($readings as $r) {
             $data[] = $r->heart_rate ?? 80;       // HR
             $data[] = $r->temperature ?? 36.5;    // Temp

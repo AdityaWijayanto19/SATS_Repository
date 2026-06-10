@@ -21,34 +21,17 @@ from datetime import datetime
 import requests
 
 # Konfigurasi
-BASE_URL = "http://localhost:8000/api"
-DEVICES_FILE = os.path.join(os.path.dirname(__file__), "devices.json")
-
-# Sensor config (sama dengan config.py)
-SENSOR_CONFIG = {
-    "heart_rate": {"min": 60, "max": 100},
-    "temperature": {"min": 36.0, "max": 37.5},
-    "spo2": {"min": 95, "max": 100},
-}
-
-THRESHOLDS = {
-    "heart_rate": {"warning_low": 50, "warning_high": 120, "critical_low": 40, "critical_high": 140},
-    "temperature": {"warning_high": 38.0, "critical_high": 39.0},
-    "spo2": {"warning_low": 90, "critical_low": 85},
-}
-
-PROFILES = {
-    "normal":   (0.95, 0.03, 0.02),
-    "warning":  (0.20, 0.60, 0.20),
-    "critical": (0.10, 0.20, 0.70),
-}
+from config import (
+    BASE_URL, DEVICES_FILE, SENSOR_CONFIG, THRESHOLDS, PROFILES,
+    NORMAL_RANGES, WARNING_THRESHOLDS, CRITICAL_THRESHOLDS,
+)
 
 
 class DeviceGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("SATS - Simulasi Perangkat IoT")
-        self.root.geometry("520x620")
+        self.root.geometry("520x650")
         self.root.resizable(False, False)
         self.root.configure(bg="#f5f5f5")
 
@@ -128,6 +111,18 @@ class DeviceGUI:
         self.profile_var = tk.StringVar(value="-")
         tk.Label(row3, textvariable=self.profile_var, font=("Segoe UI", 9, "bold"),
                  bg="#f5f5f5", fg="#333").pack(side="left", padx=(5, 0))
+
+        # Kategori Usia dropdown
+        row4 = tk.Frame(device_frame, bg="#f5f5f5")
+        row4.pack(fill="x", pady=3)
+        tk.Label(row4, text="Kategori Usia", width=10, anchor="w", font=("Segoe UI", 9),
+                 bg="#f5f5f5", fg="#555").pack(side="left")
+        self.kategori_usia_var = tk.StringVar(value="Dewasa")
+        self.kategori_usia_combo = ttk.Combobox(row4, textvariable=self.kategori_usia_var,
+                                                  values=["Balita", "Anak-anak", "Dewasa", "Lansia"],
+                                                  state="readonly", width=15, font=("Segoe UI", 9))
+        self.kategori_usia_combo.pack(side="left", padx=(5, 0))
+        self.kategori_usia_combo.bind("<<ComboboxSelected>>", self.on_kategori_usia_change)
 
         # Status frame
         status_frame = tk.LabelFrame(main_frame, text=" Status ", font=("Segoe UI", 10, "bold"),
@@ -210,7 +205,14 @@ class DeviceGUI:
         profile = self.current_device.get("profile", "normal")
         self.profile_var.set(profile.upper())
 
-        self.log(f"Device dipilih: {self.current_device['device_id']} (profile: {profile})")
+        kategori_usia = self.current_device.get("kategori_usia", "Dewasa")
+        self.kategori_usia_var.set(kategori_usia)
+
+        self.log(f"Device dipilih: {self.current_device['device_id']} (profile: {profile}, usia: {kategori_usia})")
+
+    def on_kategori_usia_change(self, event):
+        kategori_usia = self.kategori_usia_var.get()
+        self.log(f"Kategori usia diubah: {kategori_usia}")
 
     def update_status(self, online):
         self.is_online = online
@@ -221,11 +223,15 @@ class DeviceGUI:
                 self.status_label.config(text="ONLINE", fg="#22c55e")
                 self.on_btn.config(state="disabled")
                 self.off_btn.config(state="normal")
+                # Lock kategori usia saat perangkat menyala
+                self.kategori_usia_combo.config(state="disabled")
             else:
                 self.status_canvas.itemconfig(self.status_dot, fill="#ccc", outline="#ccc")
                 self.status_label.config(text="OFFLINE", fg="#999")
                 self.on_btn.config(state="normal")
                 self.off_btn.config(state="disabled")
+                # Unlock kategori usia saat perangkat mati
+                self.kategori_usia_combo.config(state="readonly")
 
         self.root.after(0, _update)
 
@@ -238,7 +244,8 @@ class DeviceGUI:
             self.log("Pilih device terlebih dahulu!", "WARN")
             return
 
-        self.log(f"Mengaktifkan perangkat {self.current_device['device_id']}...")
+        kategori_usia = self.kategori_usia_var.get()
+        self.log(f"Mengaktifkan perangkat {self.current_device['device_id']} (usia: {kategori_usia})...")
 
         def _do():
             try:
@@ -300,6 +307,27 @@ class DeviceGUI:
 
         threading.Thread(target=_do, daemon=True).start()
 
+    def classify_status(self, heart_rate, temperature, spo2):
+        """Klasifikasi kondisi pasien berdasarkan rule-based threshold per kategori usia."""
+        usia = self.kategori_usia_var.get()
+        normal = NORMAL_RANGES.get(usia, NORMAL_RANGES["Dewasa"])
+        warning = WARNING_THRESHOLDS.get(usia, WARNING_THRESHOLDS["Dewasa"])
+        critical = CRITICAL_THRESHOLDS.get(usia, CRITICAL_THRESHOLDS["Dewasa"])
+
+        # Cek CRITICAL dulu (prioritas tertinggi)
+        if (heart_rate <= critical["heart_rate"]["low"] or heart_rate >= critical["heart_rate"]["high"]
+                or spo2 <= critical["spo2"]["low"]
+                or temperature >= critical["temperature"]["high"]):
+            return "critical"
+
+        # Cek WARNING
+        if (heart_rate <= warning["heart_rate"]["low"] or heart_rate >= warning["heart_rate"]["high"]
+                or spo2 <= warning["spo2"]["low"]
+                or temperature >= warning["temperature"]["high"]):
+            return "warning"
+
+        return "normal"
+
     def generate_sensor_data(self):
         profile = self.current_device.get("profile", "normal")
         prob_normal, prob_warning, prob_critical = PROFILES.get(profile, PROFILES["normal"])
@@ -310,7 +338,6 @@ class DeviceGUI:
             heart_rate = random.randint(cfg["heart_rate"]["min"], cfg["heart_rate"]["max"])
             temperature = round(random.uniform(cfg["temperature"]["min"], cfg["temperature"]["max"]), 1)
             spo2 = random.randint(cfg["spo2"]["min"], cfg["spo2"]["max"])
-            status = "normal"
         elif roll < prob_normal + prob_warning:
             heart_rate = random.choice([
                 random.randint(45, THRESHOLDS["heart_rate"]["warning_low"]),
@@ -319,7 +346,6 @@ class DeviceGUI:
             temperature = round(random.uniform(THRESHOLDS["temperature"]["warning_high"],
                                                 THRESHOLDS["temperature"]["critical_high"]), 1)
             spo2 = random.randint(THRESHOLDS["spo2"]["critical_low"], THRESHOLDS["spo2"]["warning_low"])
-            status = "warning"
         else:
             heart_rate = random.choice([
                 random.randint(30, THRESHOLDS["heart_rate"]["critical_low"]),
@@ -327,13 +353,17 @@ class DeviceGUI:
             ])
             temperature = round(random.uniform(THRESHOLDS["temperature"]["critical_high"], 41.0), 1)
             spo2 = random.randint(70, THRESHOLDS["spo2"]["critical_low"] - 1)
-            status = "critical"
+
+        # Klasifikasi status berdasarkan threshold per kategori usia
+        status = self.classify_status(heart_rate, temperature, spo2)
+        kategori_usia = self.kategori_usia_var.get()
 
         return {
             "heart_rate": heart_rate,
             "temperature": temperature,
             "spo2": spo2,
             "status": status,
+            "kategori_usia": kategori_usia,
         }
 
     def send_sensor_loop(self):
@@ -357,7 +387,7 @@ class DeviceGUI:
                     self.log(
                         f"[#{self.data_count}] HR={data['heart_rate']}bpm | "
                         f"SpO2={data['spo2']}% | Temp={data['temperature']}C | "
-                        f"{data['status'].upper()}",
+                        f"{data['status'].upper()} | Usia={data['kategori_usia']}",
                         "DATA"
                     )
                     self.update_data_count(self.data_count)

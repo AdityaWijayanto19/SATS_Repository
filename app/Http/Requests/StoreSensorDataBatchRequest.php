@@ -20,6 +20,7 @@ class StoreSensorDataBatchRequest extends FormRequest
             'readings.*.spo2' => 'nullable|integer|min:0|max:100',
             'readings.*.temperature' => 'nullable|numeric|min:0|max:45',
             'readings.*.status' => 'nullable|in:normal,warning,critical,no_finger',
+            'readings.*.kategori_usia' => 'nullable|in:Balita,Anak-anak,Dewasa,Lansia',
             'readings.*.prediction' => 'nullable|string|max:50',
         ];
     }

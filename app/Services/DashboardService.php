@@ -220,6 +220,7 @@ class DashboardService
                     'spo2' => $latest->spo2,
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
+                    'kategori_usia' => $latest->kategori_usia,
                     'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
                 'ml' => [
@@ -268,6 +269,7 @@ class DashboardService
                     'spo2' => $latest->spo2,
                     'temperature' => $latest->temperature,
                     'status' => $latest->status,
+                    'kategori_usia' => $latest->kategori_usia,
                     'created_at' => $latest->created_at?->setTimezone('Asia/Jakarta')->format('H:i'),
                 ] : null,
                 'ml' => [

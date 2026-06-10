@@ -59,15 +59,8 @@ class SensorService
 
         $this->clearLatestDataCache($data['device_id']);
 
-        // Broadcast data baru ke semua dashboard yang terhubung
-        try {
-            broadcast(new SensorDataReceived($data['device_id'], $sensorData));
-        } catch (\Exception $e) {
-            Log::warning('Broadcast sensor data gagal (Reverb mungkin tidak running)', [
-                'device_id' => $data['device_id'],
-                'error' => $e->getMessage(),
-            ]);
-        }
+        // Broadcast sudah dilakukan oleh SensorDataController (dry model, immediate)
+        // Tidak perlu broadcast ulang di sini untuk menghindari duplikat
 
         // Trigger prediksi ML di background (tidak blocking response)
         // Hanya di-trigger setiap 5 data baru untuk menghindari API rate limit

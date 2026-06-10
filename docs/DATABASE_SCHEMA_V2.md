@@ -1,8 +1,8 @@
 # 📊 Database Schema — SATS (Smart Ambulance Tracking System)
 
-> **Generated:** 2026-06-08
+> **Generated:** 2026-06-09
 > **Total Tables:** 21 (16 application + 5 Laravel framework)
-> **Total Migrations:** 28
+> **Total Migrations:** 29
 > **Total Foreign Keys:** 23
 
 ---
@@ -107,6 +107,7 @@
    │   │           │     heart_rate      │     (CASCADE)              │
    │   │           │     spo2            │                            │
    │   │           │     temperature     │                            │
+   │   │           │     kategori_usia   │                            │
    │   │           │     status (enum)   │                            │
    │   │           │     created_at      │                            │
    │   │           └─────────────────────┘                            │
@@ -122,6 +123,7 @@
    │           │     tanggal_lahir   │    │     updated_at      │     │
    │           │     jenis_kelamin   │    └─────────────────────┘     │
    │           │     umur            │                                │
+   │           │     kategori_usia   │                                │
    │           │     penyakit_alergi │    ┌─────────────────────┐     │
    │           │     catatan_tambahan│    │  device_monitorings │     │
    │           │ FK  nakes_id ───────┼───►│─────────────────────│     │
@@ -288,6 +290,7 @@
 │   + heart_rate: integer?                                                    │
 │   + spo2: integer?                                                          │
 │   + temperature: float?                                                     │
+│   + kategori_usia: string? (Balita|Anak-anak|Dewasa|Lansia)                 │
 │   + status: enum (normal|warning|critical)?                                 │
 │   + created_at: timestamp?                                                  │
 │─────────────────────────────────────────────────────────────────────────────│
@@ -371,6 +374,7 @@
 │   + tanggal_lahir: date?                                                    │
 │   + jenis_kelamin: string                                                   │
 │   + umur: integer                                                           │
+│   + kategori_usia: string? (Balita|Anak-anak|Dewasa|Lansia)                  │
 │   + penyakit_alergi: string?                                                │
 │   + catatan_tambahan: text?                                                 │
 │   + nakes_id: bigint (FK → users.id)                                        │
@@ -719,13 +723,16 @@ Data sensor real-time mentah dari perangkat. Data final per session ada di `sens
 | `heart_rate` | integer | YES | — | Detak jantung (BPM) |
 | `spo2` | integer | YES | — | Saturasi oksigen (%) |
 | `temperature` | float | YES | — | Suhu tubuh (°C) |
-| `status` | enum(`normal`, `warning`, `critical`) | YES | — | Status vital signs |
+| `kategori_usia` | varchar | YES | — | Kategori usia pasien: `Balita` / `Anak-anak` / `Dewasa` / `Lansia` |
+| `status` | enum(`normal`, `warning`, `critical`) | YES | — | Status vital signs (rule-based per kategori usia) |
 | `created_at` | timestamp | YES | — | Indexed |
 | `updated_at` | timestamp | YES | — | |
 
 **Indexes:** PK(`id`), IDX(`device_id`), IDX(`created_at`)
 **Foreign Keys:**
 - `device_id` → `devices.device_id` ON DELETE **CASCADE** ON UPDATE **CASCADE**
+
+**Catatan:** Kolom `kategori_usia` dikirim oleh perangkat IoT bersama data sensor. Digunakan untuk klasifikasi kondisi pasien (rule-based) dan sebagai input ML API. Diisi dari perangkat, bukan dari web.
 
 ---
 
@@ -787,6 +794,7 @@ Data pasien yang terdaftar.
 | `tanggal_lahir` | date | YES | — | Tanggal lahir |
 | `jenis_kelamin` | varchar | NO | — | Jenis kelamin |
 | `umur` | integer | NO | — | Umur |
+| `kategori_usia` | varchar | YES | — | Kategori usia: `Balita` / `Anak-anak` / `Dewasa` / `Lansia` |
 | `penyakit_alergi` | varchar | YES | — | Riwayat alergi |
 | `catatan_tambahan` | text | YES | — | Catatan tambahan |
 | `nakes_id` | bigint unsigned | NO | — | FK → `users.id` (nakes yang input) |

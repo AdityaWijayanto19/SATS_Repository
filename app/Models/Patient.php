@@ -14,6 +14,7 @@ class Patient extends Model
         'tanggal_lahir',
         'jenis_kelamin',
         'umur',
+        'kategori_usia',
         'penyakit_alergi',
         'catatan_tambahan',
         'nakes_id',

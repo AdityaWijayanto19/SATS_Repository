@@ -14,6 +14,7 @@ class SensorData extends Model
         'heart_rate',
         'spo2',
         'temperature',
+        'kategori_usia',
         'status',
     ];
 

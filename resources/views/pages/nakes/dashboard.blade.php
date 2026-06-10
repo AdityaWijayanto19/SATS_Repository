@@ -145,7 +145,7 @@
                     x-text="getStatusText(latest?.temperature, 'temp')"></p>
             </div>
 
-            {{-- Kondisi Pasien --}}
+            {{-- Kondisi Pasien (dari perangkat, rule-based) --}}
             <div class="bg-[rgba(0,83,63,0.05)] rounded-xl p-4 border border-[rgba(0,83,63,0.2)]">
                 <p class="text-xs font-medium text-[rgb(0,62,48)] mb-2">Kondisi Pasien</p>
                 <p class="text-2xl font-medium"
@@ -162,7 +162,24 @@
 
         </div>
 
+        {{-- Kategori Usia --}}
+        <div class="mb-4">
+            <div class="bg-purple-50 rounded-xl p-4 border border-purple-200 inline-flex items-center gap-3">
+                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-purple-400">Kategori Usia Pasien</p>
+                    <p class="text-lg font-semibold text-purple-700" x-text="latest?.kategori_usia ?? '—'"></p>
+                </div>
+                <span class="text-[10px] text-purple-400 ml-2">Data dari perangkat</span>
+            </div>
+        </div>
+
         {{-- Prediksi ML --}}
+        <p class="text-[10px] text-gray-400 mb-1">Prediksi di update setiap 5 data terkirim</p>
         <div x-show="ml"
             class="flex items-center gap-4 bg-[rgba(0,62,48,0.05)] border border-[rgba(0,62,48,0.18)] rounded-xl px-5 py-3.5 mb-4">
             <span class="w-2 h-2 rounded-full flex-shrink-0"
@@ -489,7 +506,13 @@
                                 }
                             })
                             .listen('.sensor.data.received', (e) => {
+                                // Simpan kategori_usia sebelum update (tidak berubah selama sesi)
+                                const lockedKategoriUsia = this.latest?.kategori_usia;
                                 this.latest = e.latest;
+                                // Kunci kategori_usia — tidak di-update oleh data sensor baru
+                                if (lockedKategoriUsia && this.latest) {
+                                    this.latest.kategori_usia = lockedKategoriUsia;
+                                }
                                 if (e.latest?.ml_prediction) {
                                     this.ml = {
                                         prediction: e.latest.ml_prediction,
