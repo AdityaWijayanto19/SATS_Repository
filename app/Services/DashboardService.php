@@ -308,9 +308,9 @@ class DashboardService
             ->map(function ($device) {
                 $latestSensor = $device->sensorData->first();
                 $nakesConfig = NakesDeviceConfig::where('device_id', $device->device_id)->first();
-                $nakesName = $nakesConfig?->user?->name ?? '-';
+                $nakesName = $nakesConfig?->user?->formatted_name ?? '-';
 
-                $dokterNames = $device->monitoredByDokters()->pluck('name')->toArray();
+                $dokterNames = $device->monitoredByDokters->map(fn($d) => $d->formatted_name)->toArray();
                 $dokterName = !empty($dokterNames) ? implode(', ', $dokterNames) : '-';
 
                 return [

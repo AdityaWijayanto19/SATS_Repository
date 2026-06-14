@@ -49,12 +49,13 @@ class DashboardController extends Controller
                 return [
                     'id' => $user->id,
                     'nama' => $user->name,
+                    'formatted_name' => $user->formatted_name,
                     'email' => $user->email,
                     'role' => $user->role,
                     'role_label' => match ($user->role) {
                         'superadmin' => 'Super Admin',
                         'dokter' => 'Dokter',
-                        'nakes' => 'Perawat',
+                        'nakes' => 'Ners',
                         default => $user->role,
                     },
                     'bergabung' => $user->created_at->format('d M Y'),

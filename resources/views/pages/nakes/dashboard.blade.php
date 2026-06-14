@@ -324,17 +324,17 @@
 
                 hrChart = new Chart(document.getElementById('hrChart'), {
                     type: 'line',
-                    data: { labels: [], datasets: [{ data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true }] },
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, spanGaps: true }] },
                     options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 40, max: 160 } } }
                 });
                 spo2Chart = new Chart(document.getElementById('spo2Chart'), {
                     type: 'line',
-                    data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true }] },
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, spanGaps: true }] },
                     options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 85, max: 100 } } }
                 });
                 tempChart = new Chart(document.getElementById('tempChart'), {
                     type: 'line',
-                    data: { labels: [], datasets: [{ data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true }] },
+                    data: { labels: [], datasets: [{ data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true, spanGaps: true }] },
                     options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 35, max: 40 } } }
                 });
             }
@@ -356,6 +356,7 @@
                                 borderWidth: 1.5,
                                 pointRadius: 2,
                                 tension: 0.4,
+                                spanGaps: true,
                                 yAxisID: 'y',
                             },
                             {
@@ -366,6 +367,7 @@
                                 borderWidth: 1.5,
                                 pointRadius: 2,
                                 tension: 0.4,
+                                spanGaps: true,
                                 yAxisID: 'y1',
                             },
                             {
@@ -376,6 +378,7 @@
                                 borderWidth: 1.5,
                                 pointRadius: 2,
                                 tension: 0.4,
+                                spanGaps: true,
                                 yAxisID: 'y2',
                             }
                         ]
@@ -430,14 +433,19 @@
                     });
                     return;
                 }
-                hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = history.heart_rate; hrChart.update('none');
-                spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = history.spo2; spo2Chart.update('none');
-                tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = history.temperature; tempChart.update('none');
+                // Treat 0 as null — sensor sends 0 when finger not detected
+                const hr = history.heart_rate?.map(v => v === 0 ? null : v) ?? [];
+                const spo2 = history.spo2?.map(v => v === 0 ? null : v) ?? [];
+                const temp = history.temperature?.map(v => v === 0 ? null : v) ?? [];
+
+                hrChart.data.labels = history.labels; hrChart.data.datasets[0].data = hr; hrChart.update('none');
+                spo2Chart.data.labels = history.labels; spo2Chart.data.datasets[0].data = spo2; spo2Chart.update('none');
+                tempChart.data.labels = history.labels; tempChart.data.datasets[0].data = temp; tempChart.update('none');
                 if (combinedChart) {
                     combinedChart.data.labels = history.labels;
-                    combinedChart.data.datasets[0].data = history.heart_rate;
-                    combinedChart.data.datasets[1].data = history.spo2;
-                    combinedChart.data.datasets[2].data = history.temperature;
+                    combinedChart.data.datasets[0].data = hr;
+                    combinedChart.data.datasets[1].data = spo2;
+                    combinedChart.data.datasets[2].data = temp;
                     combinedChart.update('none');
                 }
             }

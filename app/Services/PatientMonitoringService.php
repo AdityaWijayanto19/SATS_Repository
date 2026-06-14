@@ -140,8 +140,10 @@ class PatientMonitoringService
      */
     public function getVitalSignsForDevice(string $deviceId): ?array
     {
-        // Ambil 5 data terakhir (urut ASC untuk urutan waktu yang benar)
+        // Ambil 5 data VALID terakhir (HR > 0 DAN SpO2 > 0, finger terdeteksi)
         $readings = \App\Models\SensorData::where('device_id', $deviceId)
+            ->where('heart_rate', '>', 0)
+            ->where('spo2', '>', 0)
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
@@ -149,6 +151,7 @@ class PatientMonitoringService
             ->values();
 
         if ($readings->isEmpty()) {
+            Log::info('ML: no valid sensor data found for device', ['device_id' => $deviceId]);
             return null;
         }
 
@@ -164,10 +167,16 @@ class PatientMonitoringService
         // Urutan sesuai API_INTEGRATION.md: kategori_usia, HR, Temp, SpO2
         $data = [$ageGroup];
         foreach ($readings as $r) {
-            $data[] = $r->heart_rate ?? 80;       // HR
-            $data[] = $r->temperature ?? 36.5;    // Temp
-            $data[] = $r->spo2 ?? 97;             // SpO2
+            $data[] = $r->heart_rate ?: 80;       // HR (sudah valid, > 0)
+            $data[] = $r->temperature ?: 36.5;    // Temp
+            $data[] = $r->spo2 ?: 97;             // SpO2 (sudah valid, > 0)
         }
+
+        Log::info('ML: vital signs prepared', [
+            'device_id' => $deviceId,
+            'valid_readings' => $readings->count(),
+            'age_group' => $ageGroup,
+        ]);
 
         return $data;
     }

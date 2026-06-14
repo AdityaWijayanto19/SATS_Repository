@@ -45,7 +45,7 @@
                     <template x-for="(user, index) in users" :key="user.id">
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-3 text-gray-500" x-text="index + 1"></td>
-                            <td class="px-6 py-3 font-medium text-gray-700" x-text="user.nama"></td>
+                            <td class="px-6 py-3 font-medium text-gray-700" x-text="user.formatted_name"></td>
                             <td class="px-6 py-3">
                                 <span class="text-xs font-medium px-2.5 py-1 rounded-full"
                                     :class="{
@@ -189,7 +189,7 @@
                         <option value="" disabled selected>Pilih peran</option>
                         <option value="superadmin">Super Admin</option>
                         <option value="dokter">Dokter</option>
-                        <option value="nakes">Perawat (Nakes)</option>
+                        <option value="nakes">Ners (Perawat)</option>
                     </select>
                     <template x-if="errors.role"><p class="text-xs text-red-500 mt-1" x-text="errors.role[0]"></p></template>
                 </div>

@@ -203,7 +203,7 @@
                             <option value="" disabled {{ old('dokter_id') ? '' : 'selected' }}>Pilih dokter</option>
                             @foreach($dokters as $dokter)
                                 <option value="{{ $dokter->id }}" {{ old('dokter_id') == $dokter->id ? 'selected' : '' }}>
-                                    {{ $dokter->name }}
+                                    {{ $dokter->formatted_name }}
                                 </option>
                             @endforeach
                         </select>

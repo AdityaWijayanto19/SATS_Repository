@@ -27,11 +27,9 @@ class SensorService
     {
         Log::info('Service: mulai store sensor data', $data);
 
-        // Update last_seen saja (status diatur oleh nakes via dashboard)
+        // Update last_seen (status & session ditangani oleh controller)
         Devices::where('device_id', $data['device_id'])
-            ->update([
-                'last_seen' => Carbon::now(),
-            ]);
+            ->update(['last_seen' => Carbon::now()]);
 
         // Insert sensor data
         $sensorData = SensorData::create($data);
@@ -108,24 +106,29 @@ class SensorService
 
     /**
      * Trigger prediksi ML jika sudah cukup data baru sejak prediksi terakhir.
-     * Cek tabel devices untuk ml_prediction, hitung data baru dari sensor_datas.
+     * Cek tabel devices untuk ml_prediction, hitup data baru dari sensor_datas.
+     * HANYA hitung data dengan HR > 0 DAN SpO2 > 0 (data valid, finger terdeteksi).
      */
     protected function triggerPredictionIfNeeded(string $deviceId): void
     {
         try {
             $device = Devices::where('device_id', $deviceId)->first();
 
-            // Sudah ada prediksi → cek apakah ada 5 data baru sejak prediksi terakhir
+            // Scope: hanya data valid (HR dan SpO2 harus > 0)
+            $validData = fn($q) => $q->where('heart_rate', '>', 0)->where('spo2', '>', 0);
+
+            // Sudah ada prediksi → cek apakah ada 5 data valid baru sejak prediksi terakhir
             if ($device && $device->ml_prediction) {
-                // Gunakan ml_predicted_at (bukan updated_at yang berubah setiap last_seen update)
                 $since = $device->ml_predicted_at ?? $device->updated_at;
                 $newDataCount = SensorData::where('device_id', $deviceId)
                     ->where('created_at', '>', $since)
+                    ->where('heart_rate', '>', 0)
+                    ->where('spo2', '>', 0)
                     ->count();
 
                 Log::info('ML trigger check', [
                     'device_id' => $deviceId,
-                    'new_data_count' => $newDataCount,
+                    'new_valid_data_count' => $newDataCount,
                     'has_prediction' => true,
                 ]);
 
@@ -136,12 +139,15 @@ class SensorService
                 return;
             }
 
-            // Belum ada prediksi → cek total data
-            $totalData = SensorData::where('device_id', $deviceId)->count();
+            // Belum ada prediksi → cek total data valid
+            $totalData = SensorData::where('device_id', $deviceId)
+                ->where('heart_rate', '>', 0)
+                ->where('spo2', '>', 0)
+                ->count();
 
             Log::info('ML trigger check', [
                 'device_id' => $deviceId,
-                'total_data' => $totalData,
+                'total_valid_data' => $totalData,
                 'has_prediction' => false,
             ]);
 

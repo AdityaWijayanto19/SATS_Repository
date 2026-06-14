@@ -12,7 +12,7 @@
         {{-- Avatar --}}
         @if(!empty($user->photo))
             <img src="{{ asset($user->photo) }}"
-                 alt="{{ $user->name }}"
+                 alt="{{ $user->formatted_name }}"
                  class="w-9 h-9 rounded-full object-cover ring-2 ring-white/20">
         @else
             <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/10">
@@ -22,8 +22,8 @@
 
         {{-- Name & Role --}}
         <div class="flex flex-col items-start">
-            <span class="text-sm font-semibold text-white leading-tight">{{ $user->name }}</span>
-            <span class="text-[10px] text-white/50 font-medium leading-tight">{{ ucfirst($user->role) }}</span>
+            <span class="text-sm font-semibold text-white leading-tight">{{ $user->formatted_name }}</span>
+            <span class="text-[10px] text-white/50 font-medium leading-tight">{{ $user->role === 'nakes' ? 'Ners' : ucfirst($user->role) }}</span>
         </div>
 
         {{-- Chevron --}}
@@ -47,8 +47,8 @@
 
         {{-- User Info --}}
         <div class="px-4 py-3 border-b border-gray-100">
-            <p class="text-sm font-semibold text-gray-800">{{ $user->name }}</p>
-            <p class="text-xs text-gray-400">{{ ucfirst($user->role) }}</p>
+            <p class="text-sm font-semibold text-gray-800">{{ $user->formatted_name }}</p>
+            <p class="text-xs text-gray-400">{{ $user->role === 'nakes' ? 'Ners' : ucfirst($user->role) }}</p>
         </div>
 
         {{-- Menu Items --}}

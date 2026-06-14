@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\DeviceStatusChanged;
+use App\Events\DeviceStatusChangedGlobal;
 use App\Events\SensorDataReceived;
+use App\Models\ActivityLog;
+use App\Models\Devices;
+use App\Models\NakesDeviceConfig;
 use App\Models\SensorData;
+use App\Services\MonitoringSessionService;
 use App\Services\SensorService;
 use App\Services\PatientMonitoringService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSensorDataRequest;
 use App\Http\Requests\StoreSensorDataBatchRequest;
 use App\Jobs\ProcessSensorData;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
@@ -42,6 +49,53 @@ class SensorDataController extends Controller
         return $model;
     }
 
+    /**
+     * Auto-reactivate device jika status=offline saat data masuk.
+     * Dipanggil di request context (bukan queued job) agar broadcast sampai ke browser.
+     */
+    protected function reactivateIfNeeded(string $deviceId): void
+    {
+        try {
+            $device = Devices::where('device_id', $deviceId)->first();
+            if (!$device) {
+                return;
+            }
+
+            $sessionService = app(MonitoringSessionService::class);
+            $activeSession = $sessionService->getActiveSession($deviceId);
+            $needsSession = !$activeSession;
+
+            // Case 1: Device offline → set online + broadcast + session
+            if ($device->status === 'offline') {
+                $device->update(['status' => 'online', 'last_seen' => Carbon::now()]);
+
+                if ($needsSession) {
+                    $nakesConfig = NakesDeviceConfig::where('device_id', $deviceId)->first();
+                    $userId = $nakesConfig?->user_id ?? 1;
+                    $sessionService->createSession($deviceId, $userId);
+                }
+
+                broadcast(new DeviceStatusChanged($deviceId, 'online'));
+                broadcast(new DeviceStatusChangedGlobal($deviceId, 'online'));
+                ActivityLog::log('device.online', "Perangkat {$deviceId} aktif kembali (data diterima)", 'System', 'system', $deviceId);
+                Log::info("Device {$deviceId} auto-reactivated (was offline)");
+                return;
+            }
+
+            // Case 2: Device online tapi tidak ada session aktif → buat session
+            if ($needsSession) {
+                $nakesConfig = NakesDeviceConfig::where('device_id', $deviceId)->first();
+                $userId = $nakesConfig?->user_id ?? 1;
+                $sessionService->createSession($deviceId, $userId);
+                broadcast(new DeviceStatusChanged($deviceId, 'online'));
+                broadcast(new DeviceStatusChangedGlobal($deviceId, 'online'));
+                Log::info("Session created for already-online device {$deviceId}");
+            }
+        } catch (\Exception $e) {
+            Log::warning("reactivateIfNeeded error for {$deviceId}: " . $e->getMessage());
+        }
+    }
+
     public function storeSensorData(
         string $deviceId,
         StoreSensorDataRequest $request
@@ -50,6 +104,14 @@ class SensorDataController extends Controller
         $data['device_id'] = $deviceId;
 
         $start = microtime(true);
+
+        Log::info('Controller storeSensorData called', ['device_id' => $deviceId, 'status' => Devices::where('device_id', $deviceId)->first()?->status]);
+
+        // 0. Auto-reactivate: jika device offline, set online & buat session
+        $this->reactivateIfNeeded($deviceId);
+
+        // Update last_seen langsung di controller (jangan tunggu queued job)
+        Devices::where('device_id', $deviceId)->update(['last_seen' => Carbon::now()]);
 
         // 1. IMMEDIATE real-time broadcast via WebSocket (near-zero latency)
         //    Uses a dry model instance so the event fires NOW, not after DB write.

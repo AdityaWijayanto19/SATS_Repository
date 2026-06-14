@@ -77,56 +77,22 @@
                 </div>
             </div>
 
-            {{-- Kanan: 3D Model Viewer --}}
+            {{-- Kanan: Gambar Alat --}}
             <div class="relative">
                 <div class="bg-gradient-to-br from-emerald-50 to-gray-50 rounded-3xl p-4 border border-emerald-100 shadow-lg">
-                    <model-viewer
-                        src="/assets/models/monitor-3d.glb"
-                        alt="Model 3D Perangkat SATS"
-                        camera-controls
-                        auto-rotate
-                        auto-rotate-delay="1000"
-                        rotation-per-second="25deg"
-                        interaction-prompt="auto"
-                        shadow-intensity="0.3"
-                        shadow-softness="0.5"
-                        environment-image="neutral"
-                        exposure="1.0"
-                        style="width: 100%; height: 450px; border-radius: 1rem; background: transparent;">
-                    </model-viewer>
-
-                    {{-- Instruksi kontrol --}}
-                    <div class="flex items-center justify-center gap-6 mt-3 text-[11px] text-gray-400">
-                        <span class="flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
-                            </svg>
-                            Putar
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                            </svg>
-                            Zoom
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                            </svg>
-                            Geser
-                        </span>
-                    </div>
+                    <img
+                        src="{{ asset('assets/gambaran_alat.png') }}"
+                        alt="Gambaran Perangkat SATS"
+                        class="w-full h-auto rounded-2xl object-contain"
+                        style="max-height: 450px;">
                 </div>
 
                 {{-- Floating badge --}}
                 <div class="absolute -bottom-3 -left-3 bg-[rgb(0,83,63)] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
-                    Interactive 3D
+                    Perangkat SATS
                 </div>
             </div>
 
         </div>
     </div>
 </section>
-
-{{-- Google Model Viewer --}}
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>

@@ -19,5 +19,6 @@
     {{-- Footer --}}
     @include('components.landing-footer')
 
+    @stack('scripts')
 </body>
 </html>

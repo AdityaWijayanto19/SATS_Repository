@@ -7,9 +7,5 @@
         <p class="text-emerald-200 text-lg mb-10 leading-relaxed">
             Pantau kondisi vital pasien secara real-time dan ambil tindakan medis yang tepat bahkan sebelum ambulans tiba di rumah sakit.
         </p>
-        <a href="#"
-           class="inline-block bg-white text-emerald-900 font-semibold px-10 py-4 rounded-full hover:bg-emerald-50 transition-colors duration-300 shadow-lg">
-            Coba Dashboard
-        </a>
     </div>
 </section>
