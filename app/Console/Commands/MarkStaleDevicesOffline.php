@@ -24,7 +24,7 @@ class MarkStaleDevicesOffline extends Command
         $timeout = (int) $this->option('timeout');
         $cutoff = Carbon::now()->subSeconds($timeout);
 
-        // Cari device yang status=online tapi last_seen sudah lewat timeout
+        // Cari device yang statusnya online tapi last_seen sudah lewat timeout
         $staleDevices = Devices::where('status', 'online')
             ->where('last_seen', '<', $cutoff)
             ->get();

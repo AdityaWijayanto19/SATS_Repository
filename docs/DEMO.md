@@ -241,6 +241,7 @@ Terminal 1:  npm run dev                    → Vite (CSS/JS hot reload)
 Terminal 2:  php artisan serve              → Laravel HTTP server (port 8000)
 Terminal 3:  php artisan queue:work         → Queue worker (proses data)
 Terminal 4:  php artisan reverb:start       → WebSocket server (port 8080)
+Terminal 5:  php artisan schedule:work      → Scheduler (auto-offline device)
 ```
 
 ### Akses di Browser
@@ -530,14 +531,8 @@ Tidak ada perubahan kode backend yang diperlukan.
 
 | File | Deskripsi |
 |------|-----------|
-| [README.md](README.md) | Gambaran umum project |
-| [API_DOCUMENTATION.md](API_DOCUMENTATION.md) | Dokumentasi API lengkap + integrasi ML |
-| [MASTER_BRIEF.md](MASTER_BRIEF.md) | Ringkasan lengkap project |
-| [BACKEND.md](BACKEND.md) | Arsitektur backend |
-| [DATABASE.md](DATABASE.md) | Struktur database |
-| [FRONTEND.md](FRONTEND.md) | Struktur frontend |
-| [LAPORAN_SYSTEM.md](LAPORAN_SYSTEM.md) | Desain & implementasi sistem laporan & monitoring session |
+| [MASTER_DOCS.md](MASTER_DOCS.md) | Dokumentasi teknis lengkap (database, API, ML, arsitektur) |
 
 ---
 
-*Last updated: 24 Mei 2026*
+*Last updated: 13 Juni 2026*
