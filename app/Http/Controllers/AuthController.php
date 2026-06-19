@@ -67,7 +67,7 @@ class AuthController extends Controller
         $token = $this->authService->generateResetToken($request->email);
 
         if (!$token) {
-            return back()->with('error', 'Jika email terdaftar, link reset akan dikirim.');
+            return back()->with('error', 'Email tidak terdaftar!');
         }
 
         $emailSent = $this->authService->sendPasswordResetEmail($request->email, $token);
@@ -126,7 +126,7 @@ class AuthController extends Controller
             ->route('login')
             ->with('success', $result['message']);
     }
-    
+
     public function logout(Request $request): RedirectResponse
     {
         $user = Auth::user();
