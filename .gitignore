@@ -28,3 +28,4 @@ simulasi_py/devices.json
 dump.rdb
 redis_server/
 simulasi_py/.venv/
+/docs
