@@ -20,21 +20,21 @@ class UserSeeder extends Seeder
 
         // Dokter (3 akun)
         User::create([
-            'name' => 'Dr. Andi Wijaya',
+            'name' => 'dr.Andi Wijaya',
             'email' => 'andi@sats.id',
             'password' => Hash::make('password'),
             'role' => 'dokter',
         ]);
 
         User::create([
-            'name' => 'Dr. Budi Santoso',
+            'name' => 'dr.Budi Santoso',
             'email' => 'budi@sats.id',
             'password' => Hash::make('password'),
             'role' => 'dokter',
         ]);
 
         User::create([
-            'name' => 'Dr. Citra Dewi',
+            'name' => 'dr.Citra Dewi',
             'email' => 'citra@sats.id',
             'password' => Hash::make('password'),
             'role' => 'dokter',

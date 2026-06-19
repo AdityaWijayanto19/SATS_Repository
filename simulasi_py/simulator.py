@@ -26,15 +26,19 @@ import requests
 # Interval cek status oleh monitor thread (detik)
 STATUS_CHECK_INTERVAL = 1
 
-from config import BASE_URL, DEFAULT_INTERVAL, SENSOR_CONFIG, THRESHOLDS, PROFILES, DEVICES_FILE
+from config import (
+    BASE_URL, DEFAULT_INTERVAL, SENSOR_CONFIG, THRESHOLDS, PROFILES,
+    DEVICES_FILE, KATEGORI_USIA, NORMAL_RANGES, WARNING_THRESHOLDS, CRITICAL_THRESHOLDS,
+)
 
 
 class SATSSimulator:
-    def __init__(self, device_id: str, api_key: str, profile: str = "normal", interval: int = DEFAULT_INTERVAL):
+    def __init__(self, device_id: str, api_key: str, profile: str = "normal", interval: int = DEFAULT_INTERVAL, kategori_usia: str = "Dewasa"):
         self.device_id = device_id
         self.api_key = api_key
         self.profile = profile
         self.interval = interval
+        self.kategori_usia = kategori_usia
         self.base_url = BASE_URL
         self.stop_event = threading.Event()
         self.data_count = 0
@@ -112,6 +116,32 @@ class SATSSimulator:
             self.log(f"Error: {e}", "ERROR")
             return False
 
+    def classify_status(self, heart_rate: float, temperature: float, spo2: int) -> str:
+        """
+        Klasifikasi kondisi pasien berdasarkan rule-based threshold per kategori usia.
+
+        Returns: "normal", "warning", atau "critical"
+        """
+        usia = self.kategori_usia
+        normal = NORMAL_RANGES.get(usia, NORMAL_RANGES["Dewasa"])
+        warning = WARNING_THRESHOLDS.get(usia, WARNING_THRESHOLDS["Dewasa"])
+        critical = CRITICAL_THRESHOLDS.get(usia, CRITICAL_THRESHOLDS["Dewasa"])
+
+        # Cek CRITICAL dulu (prioritas tertinggi)
+        if (heart_rate <= critical["heart_rate"]["low"] or heart_rate >= critical["heart_rate"]["high"]
+                or spo2 <= critical["spo2"]["low"]
+                or temperature >= critical["temperature"]["high"]):
+            return "critical"
+
+        # Cek WARNING
+        if (heart_rate <= warning["heart_rate"]["low"] or heart_rate >= warning["heart_rate"]["high"]
+                or spo2 <= warning["spo2"]["low"]
+                or temperature >= warning["temperature"]["high"]):
+            return "warning"
+
+        # Normal
+        return "normal"
+
     def generate_sensor_data(self) -> dict:
         cfg = SENSOR_CONFIG
         prob_normal, prob_warning, prob_critical = PROFILES.get(self.profile, PROFILES["normal"])
@@ -121,7 +151,6 @@ class SATSSimulator:
             heart_rate = random.randint(cfg["heart_rate"]["min"], cfg["heart_rate"]["max"])
             temperature = round(random.uniform(cfg["temperature"]["min"], cfg["temperature"]["max"]), 1)
             spo2 = random.randint(cfg["spo2"]["min"], cfg["spo2"]["max"])
-            status = "normal"
         elif roll < prob_normal + prob_warning:
             heart_rate = random.choice([
                 random.randint(45, THRESHOLDS["heart_rate"]["warning_low"]),
@@ -129,7 +158,6 @@ class SATSSimulator:
             ])
             temperature = round(random.uniform(THRESHOLDS["temperature"]["warning_high"], THRESHOLDS["temperature"]["critical_high"]), 1)
             spo2 = random.randint(THRESHOLDS["spo2"]["critical_low"], THRESHOLDS["spo2"]["warning_low"])
-            status = "warning"
         else:
             heart_rate = random.choice([
                 random.randint(30, THRESHOLDS["heart_rate"]["critical_low"]),
@@ -137,13 +165,16 @@ class SATSSimulator:
             ])
             temperature = round(random.uniform(THRESHOLDS["temperature"]["critical_high"], 41.0), 1)
             spo2 = random.randint(70, THRESHOLDS["spo2"]["critical_low"] - 1)
-            status = "critical"
+
+        # Klasifikasi status berdasarkan threshold per kategori usia
+        status = self.classify_status(heart_rate, temperature, spo2)
 
         return {
             "heart_rate": heart_rate,
             "temperature": temperature,
             "spo2": spo2,
             "status": status,
+            "kategori_usia": self.kategori_usia,
         }
 
     def generate_idempotency_key(self) -> str:
@@ -157,7 +188,7 @@ class SATSSimulator:
         self.log(
             f"[#{self.data_count}] HR={data['heart_rate']}bpm | "
             f"Temp={data['temperature']}C | SpO2={data['spo2']}% | "
-            f"Status={data['status'].upper()}"
+            f"Status={data['status'].upper()} | Usia={data['kategori_usia']}"
         )
 
         try:
@@ -191,7 +222,7 @@ class SATSSimulator:
                 return
 
     def run(self):
-        print(f"  [{self.device_id}] Profile: {self.profile} | Interval: {self.interval}s")
+        print(f"  [{self.device_id}] Profile: {self.profile} | Interval: {self.interval}s | Usia: {self.kategori_usia}")
 
         # Step 1: Autentikasi
         if not self.authenticate():
@@ -253,6 +284,40 @@ def load_devices() -> list:
         sys.exit(1)
 
 
+def select_kategori_usia(devices: list) -> list:
+    """Interaktif: pilih kategori usia untuk setiap device"""
+    print("=" * 60)
+    print("  PILIH KATEGORI USIA PASIEN")
+    print("=" * 60)
+    print()
+    print("  Pilihan kategori usia:")
+    for i, k in enumerate(KATEGORI_USIA, 1):
+        print(f"    {i}. {k}")
+    print()
+
+    for dev in devices:
+        default = dev.get("kategori_usia", "Dewasa")
+        default_idx = KATEGORI_USIA.index(default) + 1 if default in KATEGORI_USIA else 3
+
+        while True:
+            choice = input(f"  {dev['device_id']} (default: {default}) [{default_idx}]: ").strip()
+            if choice == "":
+                dev["kategori_usia"] = default
+                break
+            elif choice.isdigit() and 1 <= int(choice) <= len(KATEGORI_USIA):
+                dev["kategori_usia"] = KATEGORI_USIA[int(choice) - 1]
+                break
+            else:
+                print(f"    Pilih 1-{len(KATEGORI_USIA)} atau tekan Enter untuk default.")
+
+    print()
+    print("  Konfigurasi:")
+    for dev in devices:
+        print(f"    {dev['device_id']}: {dev.get('kategori_usia', 'Dewasa')}")
+    print()
+    return devices
+
+
 def main():
     devices = load_devices()
 
@@ -267,6 +332,9 @@ def main():
     print("=" * 60)
     print()
 
+    # Pilih kategori usia secara interaktif
+    devices = select_kategori_usia(devices)
+
     threads = []
     simulators = []
 
@@ -276,6 +344,7 @@ def main():
             api_key=dev["api_key"],
             profile=dev.get("profile", "normal"),
             interval=dev.get("interval", DEFAULT_INTERVAL),
+            kategori_usia=dev.get("kategori_usia", "Dewasa"),
         )
         simulators.append(sim)
         t = threading.Thread(target=sim.run, daemon=True)

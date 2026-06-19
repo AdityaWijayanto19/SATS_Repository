@@ -39,7 +39,7 @@
                                 <tr class="hover:bg-[rgba(0,62,48,0.02)] transition">
                                     <td class="px-4 py-3 font-mono text-xs">{{ $s->medical_record_number }}</td>
                                     <td class="px-4 py-3">{{ $s->patient?->nama ?? '-' }}</td>
-                                    <td class="px-4 py-3">{{ $s->creator?->name ?? '-' }}</td>
+                                    <td class="px-4 py-3">{{ $s->creator?->formatted_name ?? '-' }}</td>
                                     <td class="px-4 py-3">{{ $s->device_id }}</td>
                                     <td class="px-4 py-3">{{ $s->ended_at?->setTimezone('Asia/Jakarta')->format('d M Y, H:i') ?? '-' }}</td>
                                     <td class="px-4 py-3 text-center">

@@ -8,7 +8,9 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ManajemenAlatController;
+use App\Http\Controllers\SuperadminInboxController;
 use App\Http\Controllers\SuperadminLaporanController;
+use App\Http\Controllers\SuperadminRekamMedisController;
 use App\Http\Controllers\UserController;
 
 // Dashboard
@@ -31,3 +33,15 @@ Route::get('/input-data-pasien', [DashboardController::class, 'viewInputDataPasi
 // Laporan
 Route::get('/laporan', [SuperadminLaporanController::class, 'index'])->name('superadmin.laporan');
 Route::get('/laporan/pdf', [SuperadminLaporanController::class, 'pdf'])->name('superadmin.laporan.pdf');
+
+// Inbox (Hubungi Superadmin)
+Route::get('/inbox', [SuperadminInboxController::class, 'index'])->name('superadmin.inbox');
+Route::get('/inbox/{report}', [SuperadminInboxController::class, 'show'])->name('superadmin.inbox.show');
+Route::patch('/inbox/{report}', [SuperadminInboxController::class, 'update'])->name('superadmin.inbox.update');
+Route::delete('/inbox/{report}', [SuperadminInboxController::class, 'destroy'])->name('superadmin.inbox.destroy');
+
+// Rekam Medis
+Route::get('/rekam-medis', [SuperadminRekamMedisController::class, 'index'])->name('superadmin.rekam-medis');
+Route::get('/rekam-medis/{id}', [SuperadminRekamMedisController::class, 'show'])->name('superadmin.rekam-medis.show');
+Route::delete('/rekam-medis/{id}', [SuperadminRekamMedisController::class, 'destroy'])->name('superadmin.rekam-medis.destroy');
+Route::get('/rekam-medis/{id}/pdf', [SuperadminRekamMedisController::class, 'pdf'])->name('superadmin.rekam-medis.pdf');

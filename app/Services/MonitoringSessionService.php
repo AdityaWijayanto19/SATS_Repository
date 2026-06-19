@@ -200,9 +200,18 @@ class MonitoringSessionService
         $today = Carbon::now()->format('Ymd');
         $prefix = "RM-{$deviceId}-{$today}";
 
-        // Count existing sessions today for this device
-        $count = MonitoringSession::where('medical_record_number', 'like', "{$prefix}-%")->count();
-        $seq = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+        // Ambil sequence tertinggi hari ini untuk device ini (lebih aman dari race condition)
+        $lastSession = MonitoringSession::where('medical_record_number', 'like', "{$prefix}-%")
+            ->orderByDesc('medical_record_number')
+            ->first();
+
+        if ($lastSession) {
+            // Extract sequence dari nomor terakhir: RM-DEV_01-20260613-004 → 004
+            $lastSeq = (int) substr($lastSession->medical_record_number, -3);
+            $seq = str_pad($lastSeq + 1, 3, '0', STR_PAD_LEFT);
+        } else {
+            $seq = '001';
+        }
 
         return "{$prefix}-{$seq}";
     }

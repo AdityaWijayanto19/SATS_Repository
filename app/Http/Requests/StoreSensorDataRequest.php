@@ -27,6 +27,7 @@ class StoreSensorDataRequest extends FormRequest
             'spo2'            => 'nullable|integer|min:0|max:100',
             'temperature'     => 'nullable|numeric|min:0|max:45',
             'status'          => 'nullable|in:normal,warning,critical,no_finger',
+            'kategori_usia'   => 'nullable|in:Balita,Anak-anak,Dewasa,Lansia',
         ];
     }
 }

@@ -49,6 +49,7 @@ class SensorDataReceived implements ShouldBroadcastNow
                 'spo2' => $this->sensorData->spo2,
                 'temperature' => $this->sensorData->temperature,
                 'status' => $this->sensorData->status,
+                'kategori_usia' => $this->sensorData->kategori_usia,
                 'created_at' => $this->sensorData->created_at->setTimezone('Asia/Jakarta')->format('H:i'),
                 'ml_prediction' => $device?->ml_prediction,
                 'ml_condition' => $device?->ml_condition,
